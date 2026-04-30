@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 from PIL import Image
 
@@ -15,6 +16,10 @@ def test_run_step_writes_viewer_html_with_expected_assets(tmp_path: Path) -> Non
 
     result = run_step(paths.root)
     html = Path(result["viewer_html"]).read_text(encoding="utf-8")
+    viewer_meta = json.loads((paths.viewer / "viewer_meta.json").read_text(encoding="utf-8"))
     assert "model-viewer" in html
     assert "../inputs/content.png" in html
+    assert "../inputs/style.png" in html
+    assert "../stylize/stylized.png" in html
     assert "../retexture/mesh_stylized.glb" in html
+    assert viewer_meta == {"viewer_html": str(paths.viewer / "index.html")}
