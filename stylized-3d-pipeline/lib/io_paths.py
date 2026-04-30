@@ -19,8 +19,15 @@ class RunPaths:
 
 def resolve_run_dir(base_dir: Path, run_name: str | None) -> Path:
     if run_name:
+        if (
+            Path(run_name).is_absolute()
+            or run_name in {".", "..", ""}
+            or "/" in run_name
+            or "\\" in run_name
+        ):
+            raise ValueError("run_name must be a relative leaf name")
         return base_dir / run_name
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
     return base_dir / stamp
 
 

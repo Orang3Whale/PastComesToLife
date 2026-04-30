@@ -1,6 +1,8 @@
 from datetime import datetime
 from pathlib import Path
 
+import pytest
+
 from lib.io_paths import create_run_tree, resolve_run_dir, write_json
 
 
@@ -29,10 +31,21 @@ def test_resolve_run_dir_uses_utc_timestamp_when_run_name_missing(
     class FixedDatetime(datetime):
         @classmethod
         def now(cls, tz=None):
-            return cls(2026, 4, 30, 12, 34, 56, tzinfo=tz)
+            return cls(2026, 4, 30, 12, 34, 56, 789012, tzinfo=tz)
 
     monkeypatch.setattr("lib.io_paths.datetime", FixedDatetime, raising=False)
 
     run_dir = resolve_run_dir(tmp_path, None)
 
-    assert run_dir == tmp_path / "20260430-123456"
+    assert run_dir == tmp_path / "20260430-123456-789012"
+
+
+@pytest.mark.parametrize(
+    "run_name",
+    ["/tmp/evil", "nested/name"],
+)
+def test_resolve_run_dir_rejects_unsafe_run_names(
+    tmp_path: Path, run_name: str
+) -> None:
+    with pytest.raises(ValueError, match="run_name"):
+        resolve_run_dir(tmp_path, run_name)
