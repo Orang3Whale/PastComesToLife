@@ -7,10 +7,20 @@ from pathlib import Path
 
 from PIL import Image
 
+
 def _unwrap_mesh(output: object) -> object:
     if isinstance(output, tuple):
         return output[0]
     return output
+
+
+def build_model(device: str, sf3d_cls: type[object]) -> object:
+    model = sf3d_cls.from_pretrained(
+        "stabilityai/stable-fast-3d",
+        config_name="config.yaml",
+        weight_name="model.safetensors",
+    )
+    return model.to(device)
 
 
 def find_upstream_repo_root(anchor: Path | None = None) -> Path:
@@ -45,12 +55,10 @@ def main() -> None:
         sys.path.insert(0, str(sf3d_root))
 
     from sf3d.system import SF3D  # noqa: E402
+    import torch  # noqa: E402
 
-    model = SF3D.from_pretrained(
-        "stabilityai/stable-fast-3d",
-        config_name="config.yaml",
-        weight_name="model.safetensors",
-    )
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = build_model(device, SF3D)
     with Image.open(input_path) as image:
         mesh = _unwrap_mesh(
             model.run_image(

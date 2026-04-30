@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 
@@ -10,7 +11,7 @@ def build_viewer_html() -> str:
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Stylized 3D Viewer</title>
-    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+    <script type="module" src="model-viewer.min.js"></script>
     <style>
       :root {
         color-scheme: dark;
@@ -106,3 +107,6 @@ def build_viewer_html() -> str:
 def write_viewer(out_path: Path) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(build_viewer_html(), encoding="utf-8")
+    asset_source = Path(__file__).resolve().parent / "assets" / "model-viewer.min.js"
+    asset_target = out_path.parent / "model-viewer.min.js"
+    shutil.copyfile(asset_source, asset_target)

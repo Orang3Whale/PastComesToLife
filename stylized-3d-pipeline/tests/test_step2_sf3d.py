@@ -2,7 +2,7 @@ from pathlib import Path
 
 from lib.io_paths import create_run_tree, write_json
 from scripts.step2_sf3d import build_sf3d_command, run_step
-from scripts.workers.sf3d_worker import find_upstream_repo_root
+from scripts.workers.sf3d_worker import build_model, find_upstream_repo_root
 
 
 def test_build_sf3d_command_targets_worker(tmp_path: Path) -> None:
@@ -47,3 +47,30 @@ def test_find_upstream_repo_root_walks_parent_directories(tmp_path: Path) -> Non
     anchor.write_text("# placeholder", encoding="utf-8")
 
     assert find_upstream_repo_root(anchor) == upstream_root
+
+
+def test_build_model_moves_model_to_device() -> None:
+    class FakeModel:
+        def __init__(self) -> None:
+            self.seen_devices: list[str] = []
+
+        def to(self, device: str) -> "FakeModel":
+            self.seen_devices.append(device)
+            return self
+
+    class FakeSF3D:
+        seen_kwargs: dict[str, str] | None = None
+
+        @classmethod
+        def from_pretrained(cls, *args, **kwargs):  # noqa: ANN002, ANN003
+            cls.seen_kwargs = dict(kwargs)
+            return FakeModel()
+
+    model = build_model("cuda", FakeSF3D)
+
+    assert isinstance(model, FakeModel)
+    assert model.seen_devices == ["cuda"]
+    assert FakeSF3D.seen_kwargs == {
+        "config_name": "config.yaml",
+        "weight_name": "model.safetensors",
+    }

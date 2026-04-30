@@ -17,9 +17,13 @@ def test_run_step_writes_viewer_html_with_expected_assets(tmp_path: Path) -> Non
     result = run_step(paths.root)
     html = Path(result["viewer_html"]).read_text(encoding="utf-8")
     viewer_meta = json.loads((paths.viewer / "viewer_meta.json").read_text(encoding="utf-8"))
-    assert "model-viewer" in html
+    local_asset = paths.viewer / "model-viewer.min.js"
+    assert '<script type="module" src="model-viewer.min.js"></script>' in html
+    assert "https://unpkg.com" not in html
     assert "../inputs/content.png" in html
     assert "../inputs/style.png" in html
     assert "../stylize/stylized.png" in html
     assert "../retexture/mesh_stylized.glb" in html
+    assert local_asset.is_file()
+    assert local_asset.stat().st_size > 0
     assert viewer_meta == {"viewer_html": str(paths.viewer / "index.html")}
