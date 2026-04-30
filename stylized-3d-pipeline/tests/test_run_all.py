@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+import subprocess
 
 from scripts import run_all
 
@@ -130,3 +131,25 @@ def test_run_all_main_parses_cli_and_orchestrates(
         ("run_pipeline", resolved_run_dir, "ceramic mug"),
     ]
     assert (resolved_run_dir / "run_config.json").is_file()
+
+
+def test_documented_cli_entrypoints_support_help_from_project_root() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    scripts = [
+        "scripts/run_all.py",
+        "scripts/step1_preprocess.py",
+        "scripts/step2_sf3d.py",
+        "scripts/step3_instantstyle.py",
+        "scripts/step4_retexture.py",
+        "scripts/step5_build_viewer.py",
+    ]
+
+    for script in scripts:
+        completed = subprocess.run(
+            [sys.executable, script, "--help"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+        )
+        assert completed.returncode == 0, completed.stderr
+        assert "usage:" in completed.stdout.lower()
