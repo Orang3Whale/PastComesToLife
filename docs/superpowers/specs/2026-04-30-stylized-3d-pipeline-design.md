@@ -437,6 +437,8 @@ python scripts/run_all.py \
 - 顺序调用五个步骤
 - 失败即停并保留中间产物
 
+`stylized-3d-pipeline/scripts/workers/` 下的 worker 脚本会由编排层通过各自独立的 Python 解释器启动，这样 `SF3D` 和 `InstantStyle` 可以继续使用自己的虚拟环境，而不需要修改上游代码库本身。
+
 ## 10. 验证节点设计
 
 第一版所有步骤都必须有可检查的通过条件。
