@@ -5,10 +5,6 @@ import json
 import sys
 from pathlib import Path
 
-import cv2
-import numpy as np
-import torch
-from diffusers import ControlNetModel, StableDiffusionXLControlNetPipeline
 from PIL import Image
 
 
@@ -21,12 +17,30 @@ def find_upstream_repo_root(anchor: Path | None = None) -> Path:
     raise FileNotFoundError(f"could not locate InstantStyle relative to {current}")
 
 
-ROOT = find_upstream_repo_root(Path(__file__))
-INSTANTSTYLE_ROOT = ROOT / "InstantStyle"
-if str(INSTANTSTYLE_ROOT) not in sys.path:
-    sys.path.insert(0, str(INSTANTSTYLE_ROOT))
+def build_worker_meta(preprocess_image: Path, style_image: Path, prompt: str) -> dict[str, str]:
+    return {
+        "preprocess_image": str(preprocess_image),
+        "style_image": str(style_image),
+        "prompt": prompt,
+    }
 
-from ip_adapter import IPAdapterXL  # noqa: E402
+
+def write_worker_outputs(
+    stylize_dir: Path,
+    stylized_image: Image.Image,
+    preprocess_image: Path,
+    style_image: Path,
+    prompt: str,
+) -> dict[str, str]:
+    stylize_dir.mkdir(parents=True, exist_ok=True)
+    stylized_path = stylize_dir / "stylized.png"
+    stylized_image.save(stylized_path)
+    metadata = build_worker_meta(preprocess_image, style_image, prompt)
+    (stylize_dir / "worker_meta.json").write_text(
+        json.dumps(metadata, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    return metadata
 
 
 def main() -> None:
@@ -36,9 +50,19 @@ def main() -> None:
     parser.add_argument("--prompt", required=True)
     args = parser.parse_args()
 
+    root = find_upstream_repo_root(Path(__file__))
+    instantstyle_root = root / "InstantStyle"
+    if str(instantstyle_root) not in sys.path:
+        sys.path.insert(0, str(instantstyle_root))
+
+    import cv2  # noqa: WPS433
+    import numpy as np  # noqa: WPS433
+    import torch  # noqa: WPS433
+    from diffusers import ControlNetModel, StableDiffusionXLControlNetPipeline  # noqa: WPS433
+    from ip_adapter import IPAdapterXL  # noqa: WPS433,E402
+
     preprocess_image = args.run_dir / "preprocess" / "rgba.png"
     stylize_dir = args.run_dir / "stylize"
-    stylize_dir.mkdir(parents=True, exist_ok=True)
 
     controlnet = ControlNetModel.from_pretrained(
         "diffusers/controlnet-canny-sdxl-1.0",
@@ -84,18 +108,12 @@ def main() -> None:
 
     stylized = images[0].convert("RGBA").resize(content.size)
     stylized.putalpha(content.getchannel("A"))
-    stylized.save(stylize_dir / "stylized.png")
-    (stylize_dir / "worker_meta.json").write_text(
-        json.dumps(
-            {
-                "preprocess_image": str(preprocess_image),
-                "style_image": str(args.style_image),
-                "prompt": args.prompt,
-            },
-            indent=2,
-            sort_keys=True,
-        ),
-        encoding="utf-8",
+    write_worker_outputs(
+        stylize_dir=stylize_dir,
+        stylized_image=stylized,
+        preprocess_image=preprocess_image,
+        style_image=args.style_image,
+        prompt=args.prompt,
     )
 
 
