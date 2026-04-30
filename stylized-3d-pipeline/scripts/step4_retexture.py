@@ -54,14 +54,12 @@ def run_step(run_dir: Path) -> dict:
     mesh_stylized_path = retexture_dir / "mesh_stylized.glb"
     baked_texture.save(texture_preview_path)
 
-    mesh.visual.material.image = baked_texture
+    mesh.visual.material.baseColorTexture = baked_texture
     mesh.export(mesh_stylized_path, include_normals=True)
 
     result = {
-        "mesh_path": str(mesh_path),
-        "stylized_path": str(stylized_path),
-        "texture_preview_path": str(texture_preview_path),
-        "mesh_stylized_path": str(mesh_stylized_path),
+        "mesh_path": str(mesh_stylized_path),
+        "texture_preview": str(texture_preview_path),
     }
     write_json(retexture_dir / "retexture_meta.json", result)
     return result

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterator
 
@@ -9,19 +8,11 @@ import trimesh
 from PIL import Image
 
 
-@dataclass(frozen=True)
-class TrianglePixel:
-    x: int
-    y: int
-    barycentric: np.ndarray
-
-
-def _triangle_pixels(triangle_uv: np.ndarray, image_size: tuple[int, int]) -> Iterator[TrianglePixel]:
-    width, height = image_size
+def _triangle_pixels(width: int, height: int, tri_uv: np.ndarray) -> Iterator[tuple[int, int, np.ndarray]]:
     if width <= 0 or height <= 0:
         return
 
-    tri = np.asarray(triangle_uv, dtype=np.float32)
+    tri = np.asarray(tri_uv, dtype=np.float32)
     if tri.shape != (3, 2):
         raise ValueError("triangle_uv must have shape (3, 2)")
 
@@ -52,7 +43,7 @@ def _triangle_pixels(triangle_uv: np.ndarray, image_size: tuple[int, int]) -> It
             except np.linalg.LinAlgError:
                 continue
             if np.all(bary >= -1e-5):
-                yield TrianglePixel(x=x, y=y, barycentric=bary)
+                yield x, y, bary
 
 
 def _as_rgba(image: Image.Image | np.ndarray) -> Image.Image:
@@ -67,10 +58,10 @@ def _extract_texture_image(mesh: trimesh.Trimesh) -> Image.Image:
         raise ValueError("mesh must have textured visuals")
 
     material = getattr(visual, "material", None)
-    if material is None or not hasattr(material, "image"):
+    if material is None or not hasattr(material, "baseColorTexture"):
         raise ValueError("mesh must have a texture image")
 
-    texture = material.image
+    texture = material.baseColorTexture
     if texture is None:
         raise ValueError("mesh must have a texture image")
     return _as_rgba(texture)
@@ -123,8 +114,7 @@ def bake_visible_texels(
         triangle_uv = uv_arr[face]
         triangle_vertices = vertices_arr[face]
         face_normal = normals[face_index]
-        for pixel in _triangle_pixels(triangle_uv, baked.size):
-            bary = pixel.barycentric
+        for x, y, bary in _triangle_pixels(baked.width, baked.height, triangle_uv):
             position = (
                 triangle_vertices[0] * bary[0]
                 + triangle_vertices[1] * bary[1]
@@ -136,6 +126,6 @@ def bake_visible_texels(
             source_x, source_y = source_xy
             if not (0 <= source_x < stylized_width and 0 <= source_y < stylized_height):
                 continue
-            baked_pixels[pixel.x, pixel.y] = stylized_pixels[source_x, source_y]
+            baked_pixels[x, y] = stylized_pixels[source_x, source_y]
 
     return baked
