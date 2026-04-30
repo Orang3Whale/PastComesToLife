@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 from PIL import Image, ImageDraw
 
@@ -28,6 +29,27 @@ def test_run_step_writes_rgba_mask_and_metadata(tmp_path: Path) -> None:
     )
 
     assert result["rgba_path"].endswith("preprocess/rgba.png")
-    assert (paths.preprocess / "rgba.png").is_file()
-    assert (paths.preprocess / "mask.png").is_file()
-    assert (paths.preprocess / "meta.json").is_file()
+
+    content_image = Image.open(paths.inputs / "content.png")
+    rgba_image = Image.open(paths.preprocess / "rgba.png")
+    mask_image = Image.open(paths.preprocess / "mask.png")
+    meta = json.loads((paths.preprocess / "meta.json").read_text(encoding="utf-8"))
+
+    assert content_image.format == "PNG"
+    assert content_image.size == (64, 64)
+    assert content_image.getpixel((0, 0)) == (255, 255, 255)
+
+    assert rgba_image.format == "PNG"
+    assert rgba_image.mode == "RGBA"
+    assert rgba_image.size == (64, 64)
+    assert rgba_image.getchannel("A").getbbox() is not None
+
+    assert mask_image.format == "PNG"
+    assert mask_image.mode == "L"
+    assert mask_image.size == rgba_image.size
+    assert mask_image.getbbox() is not None
+
+    assert meta["input_path"] == str(src)
+    assert meta["rgba_path"] == str(paths.preprocess / "rgba.png")
+    assert meta["mask_path"] == str(paths.preprocess / "mask.png")
+    assert meta["foreground_ratio"] == 0.85

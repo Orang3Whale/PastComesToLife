@@ -24,14 +24,14 @@ def run_step(
 ) -> dict:
     paths = create_run_tree(run_dir)
     remove_fn = remove_background_fn or _default_remove_background
-    src = Image.open(input_path).convert("RGBA")
+    with Image.open(input_path) as source_image:
+        source_image.save(paths.inputs / "content.png", format="PNG")
+        src = source_image.convert("RGBA")
     rgba = remove_fn(src)
     rgba = resize_foreground_rgba(rgba, foreground_ratio)
 
-    input_copy = paths.inputs / "content.png"
     rgba_path = paths.preprocess / "rgba.png"
     mask_path = paths.preprocess / "mask.png"
-    input_copy.write_bytes(input_path.read_bytes())
     rgba.save(rgba_path)
     save_mask(rgba, mask_path)
 
