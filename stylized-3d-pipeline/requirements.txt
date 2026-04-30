@@ -1,0 +1,7 @@
+Pillow
+numpy
+PyYAML
+pytest
+trimesh
+pyrender
+rembg

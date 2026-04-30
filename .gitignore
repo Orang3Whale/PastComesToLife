@@ -14,6 +14,7 @@ venv/
 env/
 
 # Runtime outputs
+# Pipeline run output
 /stylized-3d-pipeline/runs/
 
 # OS/editor noise
