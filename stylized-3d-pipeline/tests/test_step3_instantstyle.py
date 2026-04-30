@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 from PIL import Image
 
@@ -19,15 +20,19 @@ def test_build_instantstyle_command_includes_prompt_and_style(tmp_path: Path) ->
     assert "ceramic mug" in cmd
 
 
-def test_run_step_requires_stylized_output(tmp_path: Path) -> None:
+def test_run_step_copies_inputs_and_returns_metadata(tmp_path: Path) -> None:
     paths = create_run_tree(tmp_path / "run")
     Image.new("RGBA", (32, 32), (255, 255, 255, 255)).save(paths.preprocess / "rgba.png")
     style_image = tmp_path / "style.jpg"
     Image.new("RGB", (32, 32), "blue").save(style_image)
 
+    seen: dict[str, object] = {}
+
     def fake_runner(cmd, env=None):  # noqa: ANN001
+        seen["cmd"] = cmd
+        seen["env"] = dict(env or {})
         Image.new("RGBA", (32, 32), (255, 0, 0, 255)).save(paths.stylize / "stylized.png")
-        write_json(paths.stylize / "stylize_meta.json", {"cmd": cmd})
+        write_json(paths.stylize / "stylize_meta.json", {"cmd": cmd, "env": env})
 
     result = run_step(
         run_dir=paths.root,
@@ -36,4 +41,18 @@ def test_run_step_requires_stylized_output(tmp_path: Path) -> None:
         prompt="ceramic mug",
         runner=fake_runner,
     )
-    assert result["stylized_path"].endswith("stylize/stylized.png")
+
+    copied_style = paths.inputs / "style.png"
+    prompt_file = paths.inputs / "prompt.txt"
+    stylize_meta = json.loads((paths.stylize / "stylize_meta.json").read_text(encoding="utf-8"))
+
+    assert copied_style.is_file()
+    assert copied_style.read_bytes() == style_image.read_bytes()
+    assert prompt_file.read_text(encoding="utf-8") == "ceramic mug"
+    assert seen["env"] == {"HF_ENDPOINT": "https://hf-mirror.com"}
+    assert stylize_meta == result
+    assert result == {
+        "stylized_path": str(paths.stylize / "stylized.png"),
+        "style_image": str(copied_style),
+        "prompt": "ceramic mug",
+    }
