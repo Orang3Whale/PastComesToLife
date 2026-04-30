@@ -7,18 +7,21 @@ from pathlib import Path
 
 from PIL import Image
 
-ROOT = Path(__file__).resolve().parents[3]
-SF3D_ROOT = ROOT / "stable-fast-3d"
-if str(SF3D_ROOT) not in sys.path:
-    sys.path.insert(0, str(SF3D_ROOT))
-
-from sf3d.system import SF3D  # noqa: E402
-
-
 def _unwrap_mesh(output: object) -> object:
     if isinstance(output, tuple):
         return output[0]
     return output
+
+
+def find_upstream_repo_root(anchor: Path | None = None) -> Path:
+    current = (anchor or Path(__file__)).resolve()
+    for parent in (current.parent, *current.parents):
+        candidate = parent / "stable-fast-3d"
+        if candidate.is_dir():
+            return parent
+    raise FileNotFoundError(
+        f"could not locate stable-fast-3d relative to {current}"
+    )
 
 
 def main() -> None:
@@ -35,6 +38,13 @@ def main() -> None:
     input_path = args.run_dir / "preprocess" / "rgba.png"
     out_dir = args.run_dir / "sf3d"
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    root = find_upstream_repo_root(Path(__file__))
+    sf3d_root = root / "stable-fast-3d"
+    if str(sf3d_root) not in sys.path:
+        sys.path.insert(0, str(sf3d_root))
+
+    from sf3d.system import SF3D  # noqa: E402
 
     model = SF3D.from_pretrained(
         "stabilityai/stable-fast-3d",
