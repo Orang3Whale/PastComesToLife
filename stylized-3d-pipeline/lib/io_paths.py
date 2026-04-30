@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from itertools import count
 from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,18 +18,25 @@ class RunPaths:
     viewer: Path
 
 
+_anonymous_run_counter = count()
+
+
 def resolve_run_dir(base_dir: Path, run_name: str | None) -> Path:
-    if run_name:
+    if run_name is not None:
         if (
-            Path(run_name).is_absolute()
-            or run_name in {".", "..", ""}
+            not run_name
+            or Path(run_name).is_absolute()
+            or run_name in {".", ".."}
             or "/" in run_name
             or "\\" in run_name
         ):
-            raise ValueError("run_name must be a relative leaf name")
+            raise ValueError("run_name must be a non-empty relative leaf name")
         return base_dir / run_name
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
-    return base_dir / stamp
+    while True:
+        candidate = base_dir / f"{stamp}-{next(_anonymous_run_counter):04d}"
+        if not candidate.exists():
+            return candidate
 
 
 def create_run_tree(run_dir: Path) -> RunPaths:

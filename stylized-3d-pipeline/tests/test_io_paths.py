@@ -1,4 +1,5 @@
 from datetime import datetime
+from itertools import count
 from pathlib import Path
 
 import pytest
@@ -34,10 +35,29 @@ def test_resolve_run_dir_uses_utc_timestamp_when_run_name_missing(
             return cls(2026, 4, 30, 12, 34, 56, 789012, tzinfo=tz)
 
     monkeypatch.setattr("lib.io_paths.datetime", FixedDatetime, raising=False)
+    monkeypatch.setattr("lib.io_paths._anonymous_run_counter", count(), raising=False)
 
     run_dir = resolve_run_dir(tmp_path, None)
 
-    assert run_dir == tmp_path / "20260430-123456-789012"
+    assert run_dir == tmp_path / "20260430-123456-789012-0000"
+
+
+def test_resolve_run_dir_generates_distinct_anonymous_paths(
+    monkeypatch, tmp_path: Path
+) -> None:
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 4, 30, 12, 34, 56, 789012, tzinfo=tz)
+
+    monkeypatch.setattr("lib.io_paths.datetime", FixedDatetime, raising=False)
+    monkeypatch.setattr("lib.io_paths._anonymous_run_counter", count(), raising=False)
+
+    first = resolve_run_dir(tmp_path, None)
+    second = resolve_run_dir(tmp_path, None)
+
+    assert first == tmp_path / "20260430-123456-789012-0000"
+    assert second == tmp_path / "20260430-123456-789012-0001"
 
 
 @pytest.mark.parametrize(
@@ -49,3 +69,8 @@ def test_resolve_run_dir_rejects_unsafe_run_names(
 ) -> None:
     with pytest.raises(ValueError, match="run_name"):
         resolve_run_dir(tmp_path, run_name)
+
+
+def test_resolve_run_dir_rejects_empty_run_name(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="run_name"):
+        resolve_run_dir(tmp_path, "")
