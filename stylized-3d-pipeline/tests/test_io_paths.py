@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 
 from lib.io_paths import create_run_tree, resolve_run_dir, write_json
@@ -20,3 +21,18 @@ def test_write_json_persists_payload(tmp_path: Path) -> None:
     out_path = tmp_path / "meta.json"
     write_json(out_path, {"step": "preprocess", "ok": True})
     assert out_path.read_text(encoding="utf-8") == '{\n  "ok": true,\n  "step": "preprocess"\n}'
+
+
+def test_resolve_run_dir_uses_utc_timestamp_when_run_name_missing(
+    monkeypatch, tmp_path: Path
+) -> None:
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 4, 30, 12, 34, 56, tzinfo=tz)
+
+    monkeypatch.setattr("lib.io_paths.datetime", FixedDatetime, raising=False)
+
+    run_dir = resolve_run_dir(tmp_path, None)
+
+    assert run_dir == tmp_path / "20260430-123456"

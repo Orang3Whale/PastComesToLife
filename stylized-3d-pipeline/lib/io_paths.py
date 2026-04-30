@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,8 +17,11 @@ class RunPaths:
     viewer: Path
 
 
-def resolve_run_dir(base_dir: Path, slug: str) -> Path:
-    return base_dir / "runs" / slug
+def resolve_run_dir(base_dir: Path, run_name: str | None) -> Path:
+    if run_name:
+        return base_dir / run_name
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    return base_dir / stamp
 
 
 def create_run_tree(run_dir: Path) -> RunPaths:
