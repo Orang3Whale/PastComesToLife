@@ -18,6 +18,7 @@ Run each stage in order when you want to inspect intermediates:
 ```bash
 python scripts/step1_preprocess.py --input /abs/path/content.jpg --run-dir runs/demo-mug
 python scripts/step2_sf3d.py --run-dir runs/demo-mug --sf3d-python /root/autodl-tmp/envs/sf3d/bin/python
+python scripts/step3_sample_views.py --run-dir runs/demo-mug --view-resolution 512 --camera-distance 1.8 --camera-fovy-deg 40.0
 python scripts/step3_instantstyle.py --run-dir runs/demo-mug --style-image /abs/path/style.jpg --prompt "ceramic mug" --instantstyle-python /root/autodl-tmp/envs/instantstyle/bin/python
 python scripts/step4_retexture.py --run-dir runs/demo-mug
 python scripts/step5_build_viewer.py --run-dir runs/demo-mug
@@ -35,11 +36,16 @@ python scripts/run_all.py \
   --run-name demo-mug \
   --runs-root runs \
   --sf3d-python /root/autodl-tmp/envs/sf3d/bin/python \
-  --instantstyle-python /root/autodl-tmp/envs/instantstyle/bin/python
+  --instantstyle-python /root/autodl-tmp/envs/instantstyle/bin/python \
+  --view-resolution 512 \
+  --camera-distance 1.8 \
+  --camera-fovy-deg 40.0 \
+  --seed 42
 ```
 
 Useful flags:
 
-- `--resume-from <step_name>` resumes from `preprocess`, `sf3d`, `instantstyle`, `retexture`, or `viewer`
+- `--resume-from <step_name>` resumes from `preprocess`, `sf3d`, `sample_views`, `instantstyle`, `retexture`, or `viewer`
 - `--skip-existing` skips any step whose metadata already exists
 - `--foreground-ratio`, `--texture-resolution`, and `--remesh-option` forward directly into the corresponding stages
+- `--view-resolution`, `--camera-distance`, `--camera-fovy-deg`, and `--seed` control the multiview sampling and stylization stages

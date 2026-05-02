@@ -13,6 +13,7 @@ class RunPaths:
     inputs: Path
     preprocess: Path
     sf3d: Path
+    views: Path
     stylize: Path
     retexture: Path
     viewer: Path
@@ -43,11 +44,12 @@ def create_run_tree(run_dir: Path) -> RunPaths:
     inputs = run_dir / "inputs"
     preprocess = run_dir / "preprocess"
     sf3d = run_dir / "sf3d"
+    views = run_dir / "views"
     stylize = run_dir / "stylize"
     retexture = run_dir / "retexture"
     viewer = run_dir / "viewer"
 
-    for path in (run_dir, inputs, preprocess, sf3d, stylize, retexture, viewer):
+    for path in (run_dir, inputs, preprocess, sf3d, views, stylize, retexture, viewer):
         path.mkdir(parents=True, exist_ok=True)
 
     return RunPaths(
@@ -55,6 +57,7 @@ def create_run_tree(run_dir: Path) -> RunPaths:
         inputs=inputs,
         preprocess=preprocess,
         sf3d=sf3d,
+        views=views,
         stylize=stylize,
         retexture=retexture,
         viewer=viewer,

@@ -1,17 +1,20 @@
 from pathlib import Path
 import sys
 import subprocess
+from types import SimpleNamespace
 
 from scripts import run_all
 
+from lib import pipeline_runner
 from lib.io_paths import create_run_tree
-from lib.pipeline_runner import ordered_steps, should_run_step
+from lib.pipeline_runner import StepMeta, ordered_steps, should_run_step
 
 
 def test_ordered_steps_matches_pipeline_contract() -> None:
     assert ordered_steps() == [
         "preprocess",
         "sf3d",
+        "sample_views",
         "instantstyle",
         "retexture",
         "viewer",
@@ -21,10 +24,98 @@ def test_ordered_steps_matches_pipeline_contract() -> None:
 def test_should_run_step_respects_resume_and_skip_existing(tmp_path: Path) -> None:
     paths = create_run_tree(tmp_path / "run")
     (paths.preprocess / "meta.json").write_text("{}", encoding="utf-8")
+    (paths.views / "manifest.json").write_text("{}", encoding="utf-8")
 
     assert should_run_step("preprocess", resume_from=None, skip_existing=True, run_dir=paths.root) is False
     assert should_run_step("sf3d", resume_from="sf3d", skip_existing=False, run_dir=paths.root) is True
+    assert should_run_step("sample_views", resume_from=None, skip_existing=True, run_dir=paths.root) is False
     assert should_run_step("preprocess", resume_from="sf3d", skip_existing=False, run_dir=paths.root) is False
+
+
+def test_sample_views_meta_points_to_manifest_json(tmp_path: Path) -> None:
+    assert pipeline_runner.STEP_META["sample_views"].meta_path(tmp_path / "run") == tmp_path / "run" / "views" / "manifest.json"
+
+
+def test_step_kwargs_for_instantstyle_include_seed(tmp_path: Path) -> None:
+    args = type(
+        "Args",
+        (),
+        {
+            "instantstyle_python": Path("/opt/instantstyle/bin/python"),
+            "style_image": Path("/tmp/style.jpg"),
+            "prompt": "ceramic mug",
+            "seed": 42,
+        },
+    )()
+
+    assert pipeline_runner._step_kwargs("instantstyle", args, tmp_path / "run") == {
+        "run_dir": tmp_path / "run",
+        "instantstyle_python": Path("/opt/instantstyle/bin/python"),
+        "style_image": Path("/tmp/style.jpg"),
+        "prompt": "ceramic mug",
+        "seed": 42,
+    }
+
+
+def test_run_pipeline_forwards_seed_and_sample_views_in_order(tmp_path: Path, monkeypatch) -> None:
+    run_dir = tmp_path / "run"
+    calls: list[tuple[str, dict[str, object]]] = []
+
+    def fake_runner(name: str):
+        def _runner(**kwargs):  # noqa: ANN003
+            calls.append((name, dict(kwargs)))
+            return {"step": name}
+
+        return _runner
+
+    custom_step_meta = {
+        "preprocess": StepMeta("preprocess", lambda path: path / "preprocess" / "meta.json", fake_runner("preprocess")),
+        "sf3d": StepMeta("sf3d", lambda path: path / "sf3d" / "sf3d_meta.json", fake_runner("sf3d")),
+        "sample_views": StepMeta("sample_views", lambda path: path / "views" / "manifest.json", fake_runner("sample_views")),
+        "instantstyle": StepMeta("instantstyle", lambda path: path / "stylize" / "stylize_meta.json", fake_runner("instantstyle")),
+        "retexture": StepMeta("retexture", lambda path: path / "retexture" / "retexture_meta.json", fake_runner("retexture")),
+        "viewer": StepMeta("viewer", lambda path: path / "viewer" / "viewer_meta.json", fake_runner("viewer")),
+    }
+    monkeypatch.setattr(pipeline_runner, "STEP_META", custom_step_meta)
+
+    args = SimpleNamespace(
+        run_dir=run_dir,
+        input=tmp_path / "content.jpg",
+        style_image=tmp_path / "style.jpg",
+        prompt="ceramic mug",
+        run_name="demo",
+        runs_root=tmp_path / "runs",
+        sf3d_python=Path("/opt/sf3d/bin/python"),
+        instantstyle_python=Path("/opt/instantstyle/bin/python"),
+        foreground_ratio=0.75,
+        texture_resolution=2048,
+        remesh_option="triangle",
+        view_resolution=512,
+        camera_distance=1.8,
+        camera_fovy_deg=40.0,
+        seed=123,
+        resume_from=None,
+        skip_existing=False,
+    )
+
+    results = pipeline_runner.run_pipeline(args)
+
+    assert [name for name, _ in calls] == [
+        "preprocess",
+        "sf3d",
+        "sample_views",
+        "instantstyle",
+        "retexture",
+        "viewer",
+    ]
+    assert calls[2][1] == {
+        "run_dir": run_dir,
+        "view_resolution": 512,
+        "camera_distance": 1.8,
+        "camera_fovy_deg": 40.0,
+    }
+    assert calls[3][1]["seed"] == 123
+    assert results["sample_views"] == {"step": "sample_views"}
 
 
 def test_run_all_main_parses_cli_and_orchestrates(
@@ -60,6 +151,10 @@ def test_run_all_main_parses_cli_and_orchestrates(
                 getattr(args, "foreground_ratio"),
                 getattr(args, "texture_resolution"),
                 getattr(args, "remesh_option"),
+                getattr(args, "view_resolution"),
+                getattr(args, "camera_distance"),
+                getattr(args, "camera_fovy_deg"),
+                getattr(args, "seed"),
                 getattr(args, "resume_from"),
                 getattr(args, "skip_existing"),
             )
@@ -102,8 +197,16 @@ def test_run_all_main_parses_cli_and_orchestrates(
             "2048",
             "--remesh-option",
             "triangle",
+            "--view-resolution",
+            "768",
+            "--camera-distance",
+            "2.25",
+            "--camera-fovy-deg",
+            "55.0",
+            "--seed",
+            "123",
             "--resume-from",
-            "sf3d",
+            "sample_views",
             "--skip-existing",
         ],
     )
@@ -125,7 +228,11 @@ def test_run_all_main_parses_cli_and_orchestrates(
             0.75,
             2048,
             "triangle",
-            "sf3d",
+            768,
+            2.25,
+            55.0,
+            123,
+            "sample_views",
             True,
         ),
         ("run_pipeline", resolved_run_dir, "ceramic mug"),
@@ -139,6 +246,7 @@ def test_documented_cli_entrypoints_support_help_from_project_root() -> None:
         "scripts/run_all.py",
         "scripts/step1_preprocess.py",
         "scripts/step2_sf3d.py",
+        "scripts/step3_sample_views.py",
         "scripts/step3_instantstyle.py",
         "scripts/step4_retexture.py",
         "scripts/step5_build_viewer.py",

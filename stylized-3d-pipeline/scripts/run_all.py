@@ -23,6 +23,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--instantstyle-python", required=True, type=Path)
     parser.add_argument("--foreground-ratio", default=0.85, type=float)
     parser.add_argument("--texture-resolution", default=1024, type=int)
+    parser.add_argument("--view-resolution", default=512, type=int)
+    parser.add_argument("--camera-distance", default=1.8, type=float)
+    parser.add_argument("--camera-fovy-deg", default=40.0, type=float)
+    parser.add_argument("--seed", default=42, type=int)
     parser.add_argument(
         "--remesh-option",
         default="none",

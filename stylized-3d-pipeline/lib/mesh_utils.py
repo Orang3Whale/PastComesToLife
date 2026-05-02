@@ -96,6 +96,7 @@ def bake_visible_texels(
     faces: np.ndarray,
     uv: np.ndarray,
     projector: Callable[[np.ndarray, np.ndarray], tuple[bool, tuple[int, int]]],
+    source_alpha_threshold: int = 1,
 ) -> Image.Image:
     base_rgba = base.convert("RGBA")
     stylized_rgba = stylized.convert("RGBA")
@@ -126,6 +127,9 @@ def bake_visible_texels(
             source_x, source_y = source_xy
             if not (0 <= source_x < stylized_width and 0 <= source_y < stylized_height):
                 continue
-            baked_pixels[x, y] = stylized_pixels[source_x, source_y]
+            source_pixel = stylized_pixels[source_x, source_y]
+            if source_pixel[3] < source_alpha_threshold:
+                continue
+            baked_pixels[x, y] = source_pixel
 
     return baked

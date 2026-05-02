@@ -8,6 +8,7 @@ from lib.io_paths import create_run_tree, write_json
 from scripts.step1_preprocess import run_step as run_preprocess_step
 from scripts.step2_sf3d import run_step as run_sf3d_step
 from scripts.step3_instantstyle import run_step as run_instantstyle_step
+from scripts.step3_sample_views import run_step as run_sample_views_step
 from scripts.step4_retexture import run_step as run_retexture_step
 from scripts.step5_build_viewer import run_step as run_viewer_step
 
@@ -27,8 +28,12 @@ def _sf3d_meta(run_dir: Path) -> Path:
     return run_dir / "sf3d" / "sf3d_meta.json"
 
 
+def _views_manifest(run_dir: Path) -> Path:
+    return run_dir / "views" / "manifest.json"
+
+
 def _instantstyle_meta(run_dir: Path) -> Path:
-    return run_dir / "stylize" / "stylize_meta.json"
+    return run_dir / "stylize" / "manifest.json"
 
 
 def _retexture_meta(run_dir: Path) -> Path:
@@ -42,6 +47,7 @@ def _viewer_meta(run_dir: Path) -> Path:
 STEP_META: Mapping[str, StepMeta] = {
     "preprocess": StepMeta("preprocess", _preprocess_meta, run_preprocess_step),
     "sf3d": StepMeta("sf3d", _sf3d_meta, run_sf3d_step),
+    "sample_views": StepMeta("sample_views", _views_manifest, run_sample_views_step),
     "instantstyle": StepMeta("instantstyle", _instantstyle_meta, run_instantstyle_step),
     "retexture": StepMeta("retexture", _retexture_meta, run_retexture_step),
     "viewer": StepMeta("viewer", _viewer_meta, run_viewer_step),
@@ -49,7 +55,7 @@ STEP_META: Mapping[str, StepMeta] = {
 
 
 def ordered_steps() -> list[str]:
-    return ["preprocess", "sf3d", "instantstyle", "retexture", "viewer"]
+    return ["preprocess", "sf3d", "sample_views", "instantstyle", "retexture", "viewer"]
 
 
 def should_run_step(
@@ -89,12 +95,20 @@ def _step_kwargs(step_name: str, args: object, run_dir: Path) -> dict[str, objec
             "texture_resolution": getattr(args, "texture_resolution"),
             "remesh_option": getattr(args, "remesh_option"),
         }
+    if step_name == "sample_views":
+        return {
+            "run_dir": run_dir,
+            "view_resolution": getattr(args, "view_resolution"),
+            "camera_distance": getattr(args, "camera_distance"),
+            "camera_fovy_deg": getattr(args, "camera_fovy_deg"),
+        }
     if step_name == "instantstyle":
         return {
             "run_dir": run_dir,
             "instantstyle_python": getattr(args, "instantstyle_python"),
             "style_image": getattr(args, "style_image"),
             "prompt": getattr(args, "prompt"),
+            "seed": getattr(args, "seed"),
         }
     if step_name == "retexture":
         return {"run_dir": run_dir}
@@ -136,6 +150,10 @@ def write_run_config(run_dir: Path, args: object) -> Path:
         "foreground_ratio": getattr(args, "foreground_ratio"),
         "texture_resolution": getattr(args, "texture_resolution"),
         "remesh_option": getattr(args, "remesh_option"),
+        "view_resolution": getattr(args, "view_resolution"),
+        "camera_distance": getattr(args, "camera_distance"),
+        "camera_fovy_deg": getattr(args, "camera_fovy_deg"),
+        "seed": getattr(args, "seed"),
         "resume_from": getattr(args, "resume_from", None),
         "skip_existing": bool(getattr(args, "skip_existing", False)),
     }

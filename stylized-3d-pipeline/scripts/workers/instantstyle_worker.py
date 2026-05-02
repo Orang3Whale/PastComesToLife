@@ -17,26 +17,55 @@ def find_upstream_repo_root(anchor: Path | None = None) -> Path:
     raise FileNotFoundError(f"could not locate InstantStyle relative to {current}")
 
 
-def build_worker_meta(preprocess_image: Path, style_image: Path, prompt: str) -> dict[str, str]:
+def build_worker_meta(
+    control_image: Path,
+    style_image: Path,
+    prompt: str,
+    seed: int,
+    output_image: Path,
+) -> dict[str, str | int]:
     return {
-        "preprocess_image": str(preprocess_image),
+        "control_image": str(control_image),
         "style_image": str(style_image),
         "prompt": prompt,
+        "seed": seed,
+        "output_image": str(output_image),
     }
 
 
+def generate_stylized_images(
+    ip_model: object,
+    style: Image.Image,
+    prompt: str,
+    canny_map: Image.Image,
+    seed: int,
+) -> object:
+    return ip_model.generate(
+        pil_image=style,
+        prompt=prompt,
+        negative_prompt="text, watermark, lowres, low quality, worst quality, deformed, blurry",
+        scale=1.0,
+        guidance_scale=5.0,
+        num_samples=1,
+        num_inference_steps=30,
+        seed=seed,
+        image=canny_map,
+        controlnet_conditioning_scale=0.6,
+    )
+
+
 def write_worker_outputs(
-    stylize_dir: Path,
+    output_image: Path,
     stylized_image: Image.Image,
-    preprocess_image: Path,
+    control_image: Path,
     style_image: Path,
     prompt: str,
-) -> dict[str, str]:
-    stylize_dir.mkdir(parents=True, exist_ok=True)
-    stylized_path = stylize_dir / "stylized.png"
-    stylized_image.save(stylized_path)
-    metadata = build_worker_meta(preprocess_image, style_image, prompt)
-    (stylize_dir / "worker_meta.json").write_text(
+    seed: int,
+) -> dict[str, str | int]:
+    output_image.parent.mkdir(parents=True, exist_ok=True)
+    stylized_image.save(output_image)
+    metadata = build_worker_meta(control_image, style_image, prompt, seed, output_image)
+    (output_image.parent / "worker_meta.json").write_text(
         json.dumps(metadata, indent=2, sort_keys=True),
         encoding="utf-8",
     )
@@ -46,8 +75,11 @@ def write_worker_outputs(
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-dir", required=True, type=Path)
+    parser.add_argument("--control-image", required=True, type=Path)
     parser.add_argument("--style-image", required=True, type=Path)
     parser.add_argument("--prompt", required=True)
+    parser.add_argument("--output-image", required=True, type=Path)
+    parser.add_argument("--seed", default=42, type=int)
     args = parser.parse_args()
 
     root = find_upstream_repo_root(Path(__file__))
@@ -60,9 +92,6 @@ def main() -> None:
     import torch  # noqa: WPS433
     from diffusers import ControlNetModel, StableDiffusionXLControlNetPipeline  # noqa: WPS433
     from ip_adapter import IPAdapterXL  # noqa: WPS433,E402
-
-    preprocess_image = args.run_dir / "preprocess" / "rgba.png"
-    stylize_dir = args.run_dir / "stylize"
 
     controlnet = ControlNetModel.from_pretrained(
         "diffusers/controlnet-canny-sdxl-1.0",
@@ -84,36 +113,31 @@ def main() -> None:
         target_blocks=["up_blocks.0.attentions.1"],
     )
 
-    with Image.open(preprocess_image) as content_image:
-        content = content_image.convert("RGBA")
-        content_rgb = np.array(content.convert("RGB"))
+    with Image.open(args.control_image) as control_image:
+        control = control_image.convert("RGB")
+        control_rgb = np.array(control)
     with Image.open(args.style_image) as style_image:
         style = style_image.convert("RGB")
 
-    canny = cv2.Canny(content_rgb, 50, 200)
+    canny = cv2.Canny(control_rgb, 50, 200)
     canny_map = Image.fromarray(canny).convert("RGB")
 
-    images = ip_model.generate(
-        pil_image=style,
+    images = generate_stylized_images(
+        ip_model=ip_model,
+        style=style,
         prompt=args.prompt,
-        negative_prompt="text, watermark, lowres, low quality, worst quality, deformed, blurry",
-        scale=1.0,
-        guidance_scale=5.0,
-        num_samples=1,
-        num_inference_steps=30,
-        seed=42,
-        image=canny_map,
-        controlnet_conditioning_scale=0.6,
+        canny_map=canny_map,
+        seed=args.seed,
     )
 
-    stylized = images[0].convert("RGBA").resize(content.size)
-    stylized.putalpha(content.getchannel("A"))
+    stylized = images[0].convert("RGBA").resize(control.size)
     write_worker_outputs(
-        stylize_dir=stylize_dir,
+        output_image=args.output_image,
         stylized_image=stylized,
-        preprocess_image=preprocess_image,
+        control_image=args.control_image,
         style_image=args.style_image,
         prompt=args.prompt,
+        seed=args.seed,
     )
 
 

@@ -15,6 +15,7 @@ def test_create_run_tree_creates_expected_directories(tmp_path: Path) -> None:
     assert paths.inputs.is_dir()
     assert paths.preprocess.is_dir()
     assert paths.sf3d.is_dir()
+    assert paths.views.is_dir()
     assert paths.stylize.is_dir()
     assert paths.retexture.is_dir()
     assert paths.viewer.is_dir()
