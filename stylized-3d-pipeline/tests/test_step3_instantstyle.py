@@ -1,11 +1,12 @@
 import json
 from pathlib import Path
 
+import numpy as np
 from PIL import Image
 
 from lib.io_paths import create_run_tree, write_json
 from scripts.step3_instantstyle import build_instantstyle_command, run_step
-from scripts.workers.instantstyle_worker import write_worker_outputs
+from scripts.workers.instantstyle_worker import build_canny_control_map, write_worker_outputs
 
 
 def test_build_instantstyle_command_includes_control_output_and_seed(tmp_path: Path) -> None:
@@ -104,7 +105,7 @@ def test_run_step_writes_per_view_stylized_outputs(tmp_path: Path) -> None:
     assert copied_style.is_file()
     assert copied_style.read_bytes() == style_image.read_bytes()
     assert prompt_file.read_text(encoding="utf-8") == "ceramic mug"
-    assert seen["env"] == {"HF_ENDPOINT": "https://hf-mirror.com"}
+    assert seen["env"] == {"HF_ENDPOINT": "https://hf-mirror.com", "OMP_NUM_THREADS": "1"}
     assert "--seed" in seen["cmd"]
     assert "123" in seen["cmd"]
     assert (paths.stylize / "front" / "stylized.png").is_file()
@@ -233,6 +234,22 @@ def test_generate_stylized_images_uses_seed() -> None:
     assert len(output) == 1
     assert seen["seed"] == 123
     assert seen["prompt"] == "ceramic mug"
+
+
+def test_build_canny_control_map_masks_transparent_pixels() -> None:
+    class FakeCv2:
+        @staticmethod
+        def Canny(control_array, low, high):  # noqa: ANN001,ANN003
+            return np.full(control_array.shape[:2], 255, dtype=np.uint8)
+
+    control = Image.new("RGBA", (2, 2), (10, 20, 30, 0))
+    control.putpixel((1, 1), (10, 20, 30, 255))
+
+    canny = build_canny_control_map(control, FakeCv2())
+    canny_array = np.asarray(canny)
+
+    assert np.all(canny_array[0, 0] == 0)
+    assert np.all(canny_array[1, 1] == 255)
 
 
 def test_write_worker_outputs_writes_stylized_image_and_meta(tmp_path: Path) -> None:

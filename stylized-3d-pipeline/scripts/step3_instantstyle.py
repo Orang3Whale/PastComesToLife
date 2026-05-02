@@ -109,7 +109,7 @@ def run_step(
             output_image=output_image,
             seed=seed,
         )
-        runner(cmd, env={"HF_ENDPOINT": "https://hf-mirror.com"})
+        runner(cmd, env={"HF_ENDPOINT": "https://hf-mirror.com", "OMP_NUM_THREADS": "1"})
         if not output_image.is_file():
             raise FileNotFoundError(f"missing stylized output: {output_image}")
         with Image.open(output_image) as stylized_image, Image.open(mask_image) as mask_source:

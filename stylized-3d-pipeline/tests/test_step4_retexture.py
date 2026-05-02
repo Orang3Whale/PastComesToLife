@@ -9,7 +9,14 @@ from trimesh.visual.material import PBRMaterial
 from trimesh.visual.texture import TextureVisuals
 
 from lib.io_paths import create_run_tree, write_json
-from lib.reprojection import ViewSample, _intrinsic_from_size, blend_samples, load_view_samples, project_point_to_view
+from lib.reprojection import (
+    ViewSample,
+    _fill_texture_gaps,
+    _intrinsic_from_size,
+    blend_samples,
+    load_view_samples,
+    project_point_to_view,
+)
 from lib.mesh_utils import bake_visible_texels, load_trimesh_with_texture
 from scripts.step4_retexture import _build_projector, run_step
 
@@ -25,6 +32,22 @@ def test_blend_samples_weights_colors() -> None:
     )
 
     assert np.array_equal(blended, np.array([191, 0, 64], dtype=np.uint8))
+
+
+def test_fill_texture_gaps_expands_painted_colors_into_uv_holes_and_background() -> None:
+    texture = Image.new("RGBA", (5, 5), (0, 0, 0, 255))
+    texture.putpixel((2, 2), (255, 0, 0, 255))
+    painted_mask = np.zeros((5, 5), dtype=bool)
+    painted_mask[2, 2] = True
+    uv_mask = np.zeros((5, 5), dtype=bool)
+    uv_mask[1:4, 1:4] = True
+
+    filled = _fill_texture_gaps(texture, painted_mask, uv_mask)
+    filled_array = np.asarray(filled)
+
+    assert np.all(filled_array[1:4, 1:4, :3] == np.array([255, 0, 0], dtype=np.uint8))
+    assert np.all(filled_array[0, 0, :3] == np.array([255, 0, 0], dtype=np.uint8))
+    assert np.all(filled_array[:, :, 3] == 255)
 
 
 def test_project_point_to_view_returns_screen_coordinates() -> None:

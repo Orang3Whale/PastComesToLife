@@ -129,6 +129,44 @@ def blend_samples(samples: list[tuple[float, np.ndarray]], fallback: np.ndarray)
     return np.clip(np.round(rgb), 0, 255).astype(np.uint8)
 
 
+def _nearest_fill_colors(
+    colors: np.ndarray,
+    valid_mask: np.ndarray,
+    fill_mask: np.ndarray,
+) -> np.ndarray:
+    fill_mask = np.asarray(fill_mask, dtype=bool)
+    valid_mask = np.asarray(valid_mask, dtype=bool)
+    if not np.any(valid_mask):
+        return np.asarray(colors, dtype=np.uint8)
+
+    target_mask = fill_mask & ~valid_mask
+    if not np.any(target_mask):
+        return np.asarray(colors, dtype=np.uint8)
+
+    try:
+        from scipy import ndimage
+    except ImportError:
+        return np.asarray(colors, dtype=np.uint8)
+
+    filled = np.asarray(colors, dtype=np.uint8).copy()
+    _, indices = ndimage.distance_transform_edt(~valid_mask, return_indices=True)
+    filled[target_mask] = filled[indices[0][target_mask], indices[1][target_mask]]
+    return filled
+
+
+def _fill_texture_gaps(texture: Image.Image, painted_mask: np.ndarray, uv_mask: np.ndarray) -> Image.Image:
+    rgba = np.asarray(texture.convert("RGBA"), dtype=np.uint8)
+    uv_mask = np.asarray(uv_mask, dtype=bool)
+    painted_mask = np.asarray(painted_mask, dtype=bool)
+    if not np.any(painted_mask):
+        return Image.fromarray(rgba, mode="RGBA")
+
+    rgba = _nearest_fill_colors(rgba, painted_mask, uv_mask)
+    rgba = _nearest_fill_colors(rgba, uv_mask, np.ones_like(uv_mask, dtype=bool))
+    rgba[:, :, 3] = 255
+    return Image.fromarray(rgba, mode="RGBA")
+
+
 def project_point_to_view(point: np.ndarray, view: ViewSample) -> ProjectedPoint | None:
     world_to_camera = np.linalg.inv(view.pose)
     homogenous = np.concatenate([np.asarray(point, dtype=np.float32), np.array([1.0], dtype=np.float32)])
@@ -276,18 +314,25 @@ def bake_texture(
     stylized_arrays = {sample.name: np.asarray(sample.stylized.convert("RGBA")) for sample in samples}
     baked_pixels = baked.load()
     base_pixels = base_rgba.load()
+    painted_mask = np.zeros((baked.height, baked.width), dtype=bool)
+    uv_mask = np.zeros((baked.height, baked.width), dtype=bool)
 
     for face_index, face in enumerate(faces):
         triangle_uv = uv[face]
         triangle_vertices = vertices[face]
         face_normal = normals[face_index]
         for x, y, bary in _triangle_pixels(baked.width, baked.height, triangle_uv):
+            uv_mask[y, x] = True
             position = (
                 triangle_vertices[0] * bary[0]
                 + triangle_vertices[1] * bary[1]
                 + triangle_vertices[2] * bary[2]
             )
-            fallback_pixel = np.asarray(base_pixels[x, y][:3], dtype=np.uint8)
+            fallback_rgb = np.asarray(base_pixels[x, y][:3], dtype=np.uint8)
+            if int(fallback_rgb.sum()) < 18:
+                fallback_pixel = np.array([184, 184, 184, 255], dtype=np.uint8)
+            else:
+                fallback_pixel = np.array([fallback_rgb[0], fallback_rgb[1], fallback_rgb[2], 255], dtype=np.uint8)
             samples_for_texel: list[tuple[float, np.ndarray]] = []
             for sample in samples:
                 sample_result = _sample_view_pixel_array(sample, stylized_arrays[sample.name], position, face_normal)
@@ -295,5 +340,9 @@ def bake_texture(
                     samples_for_texel.append(sample_result)
             color = blend_samples(samples_for_texel, fallback_pixel)
             baked_pixels[x, y] = (int(color[0]), int(color[1]), int(color[2]), 255)
+            if samples_for_texel:
+                painted_mask[y, x] = True
+
+    baked = _fill_texture_gaps(baked, painted_mask, uv_mask)
 
     return baked

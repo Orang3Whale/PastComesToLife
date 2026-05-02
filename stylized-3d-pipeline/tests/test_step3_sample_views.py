@@ -4,8 +4,10 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 import trimesh
+from trimesh.visual.material import PBRMaterial
+from trimesh.visual.texture import TextureVisuals
 
-from lib.camera_views import build_six_view_spec
+from lib.camera_views import CameraView, build_six_view_spec, look_at
 from lib.io_paths import create_run_tree
 from lib.view_sampling import render_view_assets
 from scripts.step3_sample_views import _load_mesh, run_step
@@ -44,6 +46,43 @@ def test_build_six_view_spec_fits_elongated_mesh() -> None:
         assert np.all(z > 0.0)
         assert np.max(np.abs(x_ndc)) <= 1.0 + 1e-5
         assert np.max(np.abs(y_ndc)) <= 1.0 + 1e-5
+
+
+def test_render_view_assets_replaces_missing_texture_with_opaque_fallback() -> None:
+    vertices = np.array(
+        [
+            [0.0, -0.5, -0.5],
+            [0.0, 0.5, -0.5],
+            [0.0, -0.5, 0.5],
+        ],
+        dtype=np.float32,
+    )
+    faces = np.array([[0, 1, 2]], dtype=np.int32)
+    uv = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
+    mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
+    mesh.visual = TextureVisuals(uv=uv, material=PBRMaterial(baseColorTexture=Image.new("RGBA", (4, 4), (0, 0, 0, 255))))
+
+    view = CameraView(
+        name="front",
+        pose=look_at(
+            np.array([2.0, 0.0, 0.0], dtype=np.float32),
+            np.zeros(3, dtype=np.float32),
+            np.array([0.0, 0.0, 1.0], dtype=np.float32),
+        ),
+        fovy_deg=40.0,
+    )
+    assets = render_view_assets(mesh, [view], resolution=32)
+
+    rgb = np.asarray(assets["front"]["rgb"].convert("RGBA"))
+    control = np.asarray(assets["front"]["control"].convert("RGBA"))
+    mask = np.asarray(assets["front"]["mask"])
+    visible = mask > 0
+
+    assert visible.any()
+    assert np.all(rgb[visible, 3] == 255)
+    assert np.any(rgb[visible, :3].sum(axis=1) > 0)
+    assert np.all(control[~visible, :3] == 0)
+    assert np.all(control[~visible, 3] == 0)
 
 
 def test_run_step_writes_view_manifest_and_assets(tmp_path: Path) -> None:

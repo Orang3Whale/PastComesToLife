@@ -60,15 +60,57 @@ def _extract_texture_image(mesh: trimesh.Trimesh) -> Image.Image | None:
     return _as_rgba(texture)
 
 
-def _sample_texture(texture: Image.Image | None, uv: np.ndarray) -> tuple[int, int, int, int]:
+def _sample_texture(texture: Image.Image | None, uv: np.ndarray) -> tuple[int, int, int, int] | None:
     if texture is None:
-        return (255, 255, 255, 255)
+        return None
     width, height = texture.size
     u = float(np.clip(uv[0], 0.0, 1.0))
     v = float(np.clip(uv[1], 0.0, 1.0))
     x = min(max(int(round(u * max(width - 1, 0))), 0), width - 1)
     y = min(max(int(round(v * max(height - 1, 0))), 0), height - 1)
     return texture.getpixel((x, y))
+
+
+def _face_normals(vertices: np.ndarray, faces: np.ndarray) -> np.ndarray:
+    face_vertices = vertices[faces]
+    normals = np.cross(
+        face_vertices[:, 1] - face_vertices[:, 0],
+        face_vertices[:, 2] - face_vertices[:, 0],
+    )
+    lengths = np.linalg.norm(normals, axis=1, keepdims=True)
+    lengths = np.where(lengths == 0.0, 1.0, lengths)
+    return normals / lengths
+
+
+def _is_missing_texture_sample(pixel: tuple[int, int, int, int] | None) -> bool:
+    if pixel is None:
+        return True
+    if pixel[3] < 16:
+        return True
+    return int(pixel[0]) + int(pixel[1]) + int(pixel[2]) < 18
+
+
+def _fallback_view_color(normal: np.ndarray, center: np.ndarray, camera_position: np.ndarray) -> tuple[int, int, int, int]:
+    view_dir = np.asarray(camera_position, dtype=np.float32) - np.asarray(center, dtype=np.float32)
+    view_norm = float(np.linalg.norm(view_dir))
+    normal_norm = float(np.linalg.norm(normal))
+    if view_norm <= 1e-6 or normal_norm <= 1e-6:
+        shade = 210
+    else:
+        facing = abs(float(np.dot(normal / normal_norm, view_dir / view_norm)))
+        shade = int(np.clip(round(172.0 + 68.0 * facing), 0, 255))
+    return shade, shade, shade, 255
+
+
+def _view_pixel_from_texture(
+    sampled_pixel: tuple[int, int, int, int] | None,
+    fallback_pixel: tuple[int, int, int, int],
+) -> tuple[int, int, int, int]:
+    if _is_missing_texture_sample(sampled_pixel):
+        return fallback_pixel
+    if sampled_pixel is None:
+        return fallback_pixel
+    return int(sampled_pixel[0]), int(sampled_pixel[1]), int(sampled_pixel[2]), 255
 
 
 def _project_vertices(vertices: np.ndarray, view: CameraView) -> tuple[np.ndarray, np.ndarray]:
@@ -91,13 +133,21 @@ def _to_screen(projected: np.ndarray, resolution: int) -> np.ndarray:
     return coords
 
 
+def _make_control_image(normal_rgb: np.ndarray, depth_preview: np.ndarray, mask: np.ndarray) -> Image.Image:
+    depth_rgb = np.repeat(depth_preview[:, :, None], 3, axis=2)
+    control_rgb = np.uint8(np.clip(np.round(normal_rgb.astype(np.float32) * 0.65 + depth_rgb.astype(np.float32) * 0.35), 0, 255))
+    control_rgb = np.where(mask[:, :, None] > 0, control_rgb, 0).astype(np.uint8)
+    return Image.fromarray(np.dstack([control_rgb, mask]), mode="RGBA")
+
+
 def _render_single_view(mesh: trimesh.Trimesh, view: CameraView, resolution: int) -> dict[str, object]:
     vertices = np.asarray(mesh.vertices, dtype=np.float32)
     faces = np.asarray(mesh.faces, dtype=np.int32)
+    normals = _face_normals(vertices, faces)
     uv = np.asarray(getattr(mesh.visual, "uv", None), dtype=np.float32) if getattr(mesh.visual, "uv", None) is not None else None
     texture = _extract_texture_image(mesh)
 
-    projected, camera_vertices = _project_vertices(vertices, view)
+    projected, _camera_vertices = _project_vertices(vertices, view)
     screen = _to_screen(projected, resolution)
 
     rgb = Image.new("RGBA", (resolution, resolution), (0, 0, 0, 0))
@@ -105,10 +155,12 @@ def _render_single_view(mesh: trimesh.Trimesh, view: CameraView, resolution: int
     pixels = rgb.load()
     mask = np.zeros((resolution, resolution), dtype=np.uint8)
 
-    for face in faces:
+    for face_index, face in enumerate(faces):
         face_projected = projected[face]
         face_screen = screen[face]
         face_uv = uv[face] if uv is not None else None
+        face_center = vertices[face].mean(axis=0)
+        fallback_pixel = _fallback_view_color(normals[face_index], face_center, view.pose[:3, 3])
 
         if np.all(face_projected[:, 2] <= 1e-6):
             continue
@@ -126,9 +178,9 @@ def _render_single_view(mesh: trimesh.Trimesh, view: CameraView, resolution: int
 
             if face_uv is not None:
                 tex_uv = np.dot(depth_weights, face_uv)
-                pixels[x, y] = _sample_texture(texture, tex_uv)
+                pixels[x, y] = _view_pixel_from_texture(_sample_texture(texture, tex_uv), fallback_pixel)
             else:
-                pixels[x, y] = (255, 255, 255, 255)
+                pixels[x, y] = fallback_pixel
             depth[y, x] = depth_value
             mask[y, x] = 255
 
@@ -146,8 +198,9 @@ def _render_single_view(mesh: trimesh.Trimesh, view: CameraView, resolution: int
     denom = np.linalg.norm(normal_xyz, axis=2, keepdims=True)
     denom = np.where(denom == 0.0, 1.0, denom)
     normal_rgb = np.uint8(np.clip((normal_xyz / denom + 1.0) * 127.5, 0, 255))
+    normal_rgb = np.where(mask[:, :, None] > 0, normal_rgb, 0).astype(np.uint8)
     normal_rgba = np.dstack([normal_rgb, mask])
-    control = Image.blend(Image.fromarray(normal_rgba, mode="RGBA"), Image.fromarray(depth_preview, mode="L").convert("RGBA"), 0.5)
+    control = _make_control_image(normal_rgb, depth_preview, mask)
 
     return {
         "rgb": rgb,

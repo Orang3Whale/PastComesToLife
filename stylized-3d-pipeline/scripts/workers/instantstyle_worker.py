@@ -5,6 +5,7 @@ import json
 import sys
 from pathlib import Path
 
+import numpy as np
 from PIL import Image
 
 
@@ -54,6 +55,15 @@ def generate_stylized_images(
     )
 
 
+def build_canny_control_map(control: Image.Image, cv2_module: object) -> Image.Image:
+    control_rgba = control.convert("RGBA")
+    control_array = np.asarray(control_rgba)
+    canny = cv2_module.Canny(control_array[:, :, :3], 50, 200)
+    canny = np.asarray(canny, dtype=np.uint8)
+    canny[control_array[:, :, 3] < 1] = 0
+    return Image.fromarray(canny).convert("RGB")
+
+
 def write_worker_outputs(
     output_image: Path,
     stylized_image: Image.Image,
@@ -88,7 +98,6 @@ def main() -> None:
         sys.path.insert(0, str(instantstyle_root))
 
     import cv2  # noqa: WPS433
-    import numpy as np  # noqa: WPS433
     import torch  # noqa: WPS433
     from diffusers import ControlNetModel, StableDiffusionXLControlNetPipeline  # noqa: WPS433
     from ip_adapter import IPAdapterXL  # noqa: WPS433,E402
@@ -114,13 +123,11 @@ def main() -> None:
     )
 
     with Image.open(args.control_image) as control_image:
-        control = control_image.convert("RGB")
-        control_rgb = np.array(control)
+        control = control_image.convert("RGBA")
     with Image.open(args.style_image) as style_image:
         style = style_image.convert("RGB")
 
-    canny = cv2.Canny(control_rgb, 50, 200)
-    canny_map = Image.fromarray(canny).convert("RGB")
+    canny_map = build_canny_control_map(control, cv2)
 
     images = generate_stylized_images(
         ip_model=ip_model,
