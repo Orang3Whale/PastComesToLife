@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Callable
 
 from PIL import Image
 
@@ -66,7 +67,10 @@ def prepare_control_image(control: Image.Image) -> Image.Image:
     return Image.alpha_composite(background, geometry).convert("RGB")
 
 
-def build_pipeline_and_adapter(device: str = "cuda") -> tuple[object, object]:
+def build_pipeline_and_adapter(
+    device: str = "cuda",
+    ip_adapter_cls: Callable[..., object] | None = None,
+) -> tuple[object, object]:
     import torch  # noqa: WPS433
 
     controlnet = ControlNetModel.from_pretrained(
@@ -81,7 +85,8 @@ def build_pipeline_and_adapter(device: str = "cuda") -> tuple[object, object]:
         add_watermarker=False,
     ).to(device)
     pipe.enable_vae_tiling()
-    ip_model = IPAdapterXL(
+    adapter_cls = ip_adapter_cls or IPAdapterXL
+    ip_model = adapter_cls(
         pipe,
         "sdxl_models/image_encoder",
         "sdxl_models/ip-adapter_sdxl.bin",
@@ -161,7 +166,14 @@ def main() -> None:
     if str(instantstyle_root) not in sys.path:
         sys.path.insert(0, str(instantstyle_root))
 
-    _, ip_model = build_pipeline_and_adapter(device="cuda")
+    try:
+        from ip_adapter import IPAdapterXL as runtime_ip_adapter
+    except Exception as exc:  # pragma: no cover - depends on worker environment
+        raise RuntimeError(
+            f"could not import ip_adapter after adding {instantstyle_root} to sys.path"
+        ) from exc
+
+    _, ip_model = build_pipeline_and_adapter(device="cuda", ip_adapter_cls=runtime_ip_adapter)
 
     with Image.open(args.rgb_image) as rgb_image:
         base = prepare_base_image(rgb_image)
