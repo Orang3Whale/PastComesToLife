@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import numpy as np
 import pytest
 import trimesh
@@ -68,14 +66,19 @@ def test_render_offscreen_view_returns_rgba_color_and_depth() -> None:
         renderer_factory=lambda width, height: FakeRenderer(width, height),
     )
 
-    rgb = np.asarray(assets["rgb"].convert("RGBA"))
+    assert isinstance(assets["rgb"], Image.Image)
+    assert assets["rgb"].mode == "RGBA"
+
+    rgb = np.asarray(assets["rgb"])
     depth = assets["depth"]
 
     assert rgb.shape == (8, 8, 4)
     assert depth.shape == (8, 8)
+    assert depth.dtype == np.float32
     assert rgb[0, 0, 3] == 0
     assert rgb[3, 3, 3] == 255
     assert rgb[3, 3, 0] == 220
+    assert assets["camera"]["pose"] == view.pose.tolist()
 
 
 def test_render_offscreen_view_raises_clear_error_when_backend_missing() -> None:

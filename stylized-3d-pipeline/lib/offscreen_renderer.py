@@ -1,22 +1,15 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Callable
 
 import numpy as np
+import pyrender
 import trimesh
 from PIL import Image
 
 from lib.camera_views import CameraView
 
-try:
-    import pyrender
-except ModuleNotFoundError:  # pragma: no cover - depends on optional runtime environment
-    pyrender = None
-
-_BACKEND_ERROR = (
-    "offscreen rendering failed; install pyrender and configure a headless OpenGL backend "
-    "such as PYOPENGL_PLATFORM=egl or OSMesa"
-)
+_BACKEND_ERROR = "offscreen rendering failed; configure PYOPENGL_PLATFORM=egl or OSMesa"
 
 
 def build_neutral_render_mesh(
@@ -29,10 +22,7 @@ def build_neutral_render_mesh(
     return neutral
 
 
-def _make_scene(mesh: trimesh.Trimesh, view: CameraView) -> Any:
-    if pyrender is None:
-        return None
-
+def _make_scene(mesh: trimesh.Trimesh, view: CameraView) -> pyrender.Scene:
     scene = pyrender.Scene(bg_color=[0.0, 0.0, 0.0, 0.0], ambient_light=[0.18, 0.18, 0.18])
     scene.add(pyrender.Mesh.from_trimesh(build_neutral_render_mesh(mesh), smooth=False))
     scene.add(pyrender.PerspectiveCamera(yfov=np.deg2rad(view.fovy_deg)), pose=view.pose)
@@ -70,22 +60,16 @@ def render_offscreen_view(
     mesh: trimesh.Trimesh,
     view: CameraView,
     resolution: int,
-    renderer_factory: Callable[[int, int], object] | None = None,
+    renderer_factory: Callable[[int, int], object] = pyrender.OffscreenRenderer,
 ) -> dict[str, object]:
-    if renderer_factory is None:
-        if pyrender is None:
-            raise RuntimeError(_BACKEND_ERROR)
-        renderer_factory = pyrender.OffscreenRenderer
-
-    scene = _make_scene(mesh, view)
     try:
         renderer = renderer_factory(resolution, resolution)
     except Exception as exc:  # noqa: BLE001
         raise RuntimeError(_BACKEND_ERROR) from exc
 
+    scene = _make_scene(mesh, view)
     try:
-        flags = pyrender.RenderFlags.RGBA if pyrender is not None else None
-        color, depth = renderer.render(scene, flags=flags)
+        color, depth = renderer.render(scene, flags=pyrender.RenderFlags.RGBA)
     except Exception as exc:  # noqa: BLE001
         raise RuntimeError(_BACKEND_ERROR) from exc
     finally:
@@ -109,7 +93,7 @@ def render_offscreen_view(
         "depth": depth_array,
         "camera": {
             "name": view.name,
-            "pose": view.pose,
+            "pose": view.pose.tolist(),
             "fovy_deg": view.fovy_deg,
         },
     }
@@ -119,7 +103,7 @@ def render_offscreen_views(
     mesh: trimesh.Trimesh,
     views: list[CameraView],
     resolution: int,
-    renderer_factory: Callable[[int, int], object] | None = None,
+    renderer_factory: Callable[[int, int], object] = pyrender.OffscreenRenderer,
 ) -> dict[str, dict[str, object]]:
     return {
         view.name: render_offscreen_view(
