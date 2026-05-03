@@ -104,6 +104,7 @@ def test_render_view_assets_derives_outputs_from_offscreen_alpha(monkeypatch: py
     assert np.any(rgb[visible, :3].sum(axis=1) > 0)
     assert np.all(rgb[~visible, 3] == 0)
     assert np.all(depth_preview[~visible, 3] == 0)
+    assert np.array_equal(normal[8, 8, :3], normal[16, 16, :3])
     assert np.all(normal[~visible, 3] == 0)
     assert np.all(control[~visible, :3] == 0)
     assert np.all(control[~visible, 3] == 0)

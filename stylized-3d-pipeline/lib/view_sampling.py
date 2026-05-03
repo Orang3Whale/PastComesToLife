@@ -24,6 +24,22 @@ def _make_control_image(normal_rgb: np.ndarray, depth_preview: np.ndarray, mask:
     return Image.fromarray(np.dstack([control_rgb, mask]), mode="RGBA")
 
 
+def _depth_for_normal_estimation(valid_depth: np.ndarray, visible: np.ndarray) -> np.ndarray:
+    if not np.any(visible):
+        return np.zeros_like(valid_depth, dtype=np.float32)
+
+    try:
+        from scipy import ndimage
+    except ImportError:
+        fill_value = float(valid_depth[visible].max())
+        return np.where(visible, valid_depth, fill_value).astype(np.float32)
+
+    _, indices = ndimage.distance_transform_edt(~visible, return_indices=True)
+    filled = np.asarray(valid_depth, dtype=np.float32).copy()
+    filled[~visible] = filled[indices[0][~visible], indices[1][~visible]]
+    return filled
+
+
 def _derive_secondary_maps(rgb: Image.Image | np.ndarray, depth: np.ndarray, fovy_deg: float) -> dict[str, object]:
     del fovy_deg
     rgba = _as_rgba(rgb)
@@ -46,8 +62,9 @@ def _derive_secondary_maps(rgb: Image.Image | np.ndarray, depth: np.ndarray, fov
         depth_preview = np.zeros_like(valid_depth, dtype=np.float32)
 
     depth_preview_u8 = np.uint8(np.clip(depth_preview, 0.0, 1.0) * 255)
-    gy, gx = np.gradient(valid_depth)
-    normal_xyz = np.dstack((-gx, -gy, np.ones_like(valid_depth)))
+    normal_depth = _depth_for_normal_estimation(valid_depth, visible)
+    gy, gx = np.gradient(normal_depth)
+    normal_xyz = np.dstack((-gx, -gy, np.ones_like(normal_depth)))
     denom = np.linalg.norm(normal_xyz, axis=2, keepdims=True)
     denom = np.where(denom == 0.0, 1.0, denom)
     normal_rgb = np.uint8(np.clip((normal_xyz / denom + 1.0) * 127.5, 0, 255))
