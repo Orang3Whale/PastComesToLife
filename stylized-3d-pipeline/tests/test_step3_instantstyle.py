@@ -9,20 +9,26 @@ from scripts.step3_instantstyle import build_instantstyle_command, run_step
 from scripts.workers.instantstyle_worker import build_canny_control_map, write_worker_outputs
 
 
-def test_build_instantstyle_command_includes_control_output_and_seed(tmp_path: Path) -> None:
+def test_build_instantstyle_command_includes_rgb_control_and_strength(tmp_path: Path) -> None:
     cmd = build_instantstyle_command(
         instantstyle_python=Path("/envs/instantstyle/bin/python"),
         worker_script=Path("/repo/stylized-3d-pipeline/scripts/workers/instantstyle_worker.py"),
         run_dir=tmp_path / "run",
+        rgb_image=Path("/run/views/front/rgb.png"),
         control_image=Path("/run/views/front/control.png"),
         style_image=Path("/tmp/style.jpg"),
         prompt="ceramic mug",
         output_image=Path("/run/stylize/front/stylized.png"),
         seed=123,
+        strength=0.45,
     )
     assert cmd[0] == "/envs/instantstyle/bin/python"
+    assert "--rgb-image" in cmd
+    assert "/run/views/front/rgb.png" in cmd
     assert "--control-image" in cmd
     assert "/run/views/front/control.png" in cmd
+    assert "--strength" in cmd
+    assert "0.45" in cmd
     assert "--output-image" in cmd
     assert "/run/stylize/front/stylized.png" in cmd
     assert "ceramic mug" in cmd
@@ -30,7 +36,7 @@ def test_build_instantstyle_command_includes_control_output_and_seed(tmp_path: P
     assert "123" in cmd
 
 
-def test_run_step_writes_per_view_stylized_outputs(tmp_path: Path) -> None:
+def test_run_step_writes_rgb_control_and_strength_into_manifest(tmp_path: Path) -> None:
     paths = create_run_tree(tmp_path / "run")
     write_json(
         paths.views / "manifest.json",
@@ -38,31 +44,37 @@ def test_run_step_writes_per_view_stylized_outputs(tmp_path: Path) -> None:
             "views": [
                 {
                     "name": "front",
+                    "rgb_path": str(paths.views / "front" / "rgb.png"),
                     "control_path": str(paths.views / "front" / "control.png"),
                     "mask_path": str(paths.views / "front" / "mask.png"),
                 },
                 {
                     "name": "back",
+                    "rgb_path": str(paths.views / "back" / "rgb.png"),
                     "control_path": str(paths.views / "back" / "control.png"),
                     "mask_path": str(paths.views / "back" / "mask.png"),
                 },
                 {
                     "name": "left",
+                    "rgb_path": str(paths.views / "left" / "rgb.png"),
                     "control_path": str(paths.views / "left" / "control.png"),
                     "mask_path": str(paths.views / "left" / "mask.png"),
                 },
                 {
                     "name": "right",
+                    "rgb_path": str(paths.views / "right" / "rgb.png"),
                     "control_path": str(paths.views / "right" / "control.png"),
                     "mask_path": str(paths.views / "right" / "mask.png"),
                 },
                 {
                     "name": "top",
+                    "rgb_path": str(paths.views / "top" / "rgb.png"),
                     "control_path": str(paths.views / "top" / "control.png"),
                     "mask_path": str(paths.views / "top" / "mask.png"),
                 },
                 {
                     "name": "bottom",
+                    "rgb_path": str(paths.views / "bottom" / "rgb.png"),
                     "control_path": str(paths.views / "bottom" / "control.png"),
                     "mask_path": str(paths.views / "bottom" / "mask.png"),
                 },
@@ -72,6 +84,7 @@ def test_run_step_writes_per_view_stylized_outputs(tmp_path: Path) -> None:
     for name in ("front", "back", "left", "right", "top", "bottom"):
         view_dir = paths.views / name
         view_dir.mkdir(parents=True, exist_ok=True)
+        Image.new("RGBA", (8, 8), (64, 128, 192, 255)).save(view_dir / "rgb.png")
         Image.new("RGBA", (8, 8), (0, 0, 0, 255)).save(view_dir / "control.png")
         mask = Image.new("L", (8, 8), 0)
         for y in range(2, 6):
@@ -95,6 +108,7 @@ def test_run_step_writes_per_view_stylized_outputs(tmp_path: Path) -> None:
         style_image=style_image,
         prompt="ceramic mug",
         seed=123,
+        strength=0.45,
         runner=fake_runner,
     )
 
@@ -106,6 +120,10 @@ def test_run_step_writes_per_view_stylized_outputs(tmp_path: Path) -> None:
     assert copied_style.read_bytes() == style_image.read_bytes()
     assert prompt_file.read_text(encoding="utf-8") == "ceramic mug"
     assert seen["env"] == {"HF_ENDPOINT": "https://hf-mirror.com", "OMP_NUM_THREADS": "1"}
+    assert "--rgb-image" in seen["cmd"]
+    assert "--control-image" in seen["cmd"]
+    assert "--strength" in seen["cmd"]
+    assert "0.45" in seen["cmd"]
     assert "--seed" in seen["cmd"]
     assert "123" in seen["cmd"]
     assert (paths.stylize / "front" / "stylized.png").is_file()
@@ -113,6 +131,9 @@ def test_run_step_writes_per_view_stylized_outputs(tmp_path: Path) -> None:
     assert (paths.stylize / "stylized.png").is_file()
     assert stylize_manifest == result
     assert [name for name in result["views"]] == ["front", "back", "left", "right", "top", "bottom"]
+    assert result["strength"] == 0.45
+    assert result["views"]["front"]["rgb_path"] == str(paths.views / "front" / "rgb.png")
+    assert result["views"]["front"]["control_path"] == str(paths.views / "front" / "control.png")
     assert result["views"]["front"]["stylized_path"] == str(paths.stylize / "front" / "stylized.png")
     with Image.open(paths.stylize / "front" / "stylized.png") as stylized:
         assert stylized.mode == "RGBA"

@@ -21,17 +21,21 @@ def build_instantstyle_command(
     instantstyle_python: Path,
     worker_script: Path,
     run_dir: Path,
+    rgb_image: Path,
     control_image: Path,
     style_image: Path,
     prompt: str,
     output_image: Path,
     seed: int,
+    strength: float,
 ) -> list[str]:
     return [
         str(instantstyle_python),
         str(worker_script),
         "--run-dir",
         str(run_dir),
+        "--rgb-image",
+        str(rgb_image),
         "--control-image",
         str(control_image),
         "--style-image",
@@ -42,6 +46,8 @@ def build_instantstyle_command(
         str(output_image),
         "--seed",
         str(seed),
+        "--strength",
+        str(strength),
     ]
 
 
@@ -51,6 +57,7 @@ def run_step(
     style_image: Path,
     prompt: str,
     seed: int = 42,
+    strength: float = 0.45,
     runner: Callable[..., None] = run_checked,
 ) -> dict:
     paths = create_run_tree(run_dir)
@@ -73,8 +80,7 @@ def run_step(
         if not isinstance(view, dict):
             raise ValueError(f"invalid view entry in {view_manifest_path}")
         view_name = view.get("name")
-        control_path = view.get("control_path")
-        if not isinstance(view_name, str) or not isinstance(control_path, str):
+        if not isinstance(view_name, str):
             raise ValueError(f"invalid view entry in {view_manifest_path}")
         seen_view_order.append(view_name)
 
@@ -83,31 +89,39 @@ def run_step(
             f"view manifest must match canonical order: expected {expected_view_order}, got {seen_view_order}",
         )
 
+    for view in views:
+        if not all(
+            isinstance(view.get(key), str)
+            for key in ("rgb_path", "control_path", "mask_path")
+        ):
+            raise ValueError(f"invalid view entry in {view_manifest_path}")
+
     worker_script = Path(__file__).resolve().parent / "workers" / "instantstyle_worker.py"
-    result: dict[str, dict[str, dict[str, str]] | str] = {
+    result: dict[str, dict[str, dict[str, str]] | float | str] = {
         "style_image": str(style_copy),
         "prompt": prompt,
+        "strength": strength,
         "views": {},
     }
 
     for view in views:
         view_name = view["name"]
+        rgb_image = Path(view["rgb_path"])
         control_image = Path(view["control_path"])
-        mask_path_value = view.get("mask_path")
-        if not isinstance(mask_path_value, str):
-            raise ValueError(f"invalid view entry in {view_manifest_path}")
-        mask_image = Path(mask_path_value)
+        mask_image = Path(view["mask_path"])
         output_image = paths.stylize / view_name / "stylized.png"
         output_image.parent.mkdir(parents=True, exist_ok=True)
         cmd = build_instantstyle_command(
             instantstyle_python=instantstyle_python,
             worker_script=worker_script,
             run_dir=paths.root,
+            rgb_image=rgb_image,
             control_image=control_image,
             style_image=style_copy,
             prompt=prompt,
             output_image=output_image,
             seed=seed,
+            strength=strength,
         )
         runner(cmd, env={"HF_ENDPOINT": "https://hf-mirror.com", "OMP_NUM_THREADS": "1"})
         if not output_image.is_file():
@@ -118,6 +132,7 @@ def run_step(
             stylized.putalpha(mask)
             stylized.save(output_image)
         result["views"][view_name] = {
+            "rgb_path": str(rgb_image),
             "control_path": str(control_image),
             "stylized_path": str(output_image),
         }
