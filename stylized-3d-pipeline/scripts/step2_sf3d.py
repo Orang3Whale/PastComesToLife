@@ -10,7 +10,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from lib.io_paths import create_run_tree, write_json
-from lib.subprocess_utils import run_checked
+from lib.subprocess_utils import huggingface_cache_env, run_checked
 
 
 def build_sf3d_command(
@@ -48,7 +48,9 @@ def run_step(
         texture_resolution=texture_resolution,
         remesh_option=remesh_option,
     )
-    runner(cmd, env={"HF_ENDPOINT": "https://hf-mirror.com"})
+    worker_env = huggingface_cache_env()
+    worker_env.update({"HF_ENDPOINT": "https://hf-mirror.com"})
+    runner(cmd, env=worker_env)
 
     mesh_path = paths.sf3d / "mesh_raw.glb"
     if not mesh_path.is_file():

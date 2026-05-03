@@ -14,7 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from lib.io_paths import create_run_tree, write_json
-from lib.subprocess_utils import run_checked
+from lib.subprocess_utils import huggingface_cache_env, run_checked
 
 
 def build_instantstyle_command(
@@ -95,6 +95,10 @@ def run_step(
             for key in ("rgb_path", "control_path", "mask_path")
         ):
             raise ValueError(f"invalid view entry in {view_manifest_path}")
+        for key in ("rgb_path", "control_path", "mask_path"):
+            path = Path(view[key])
+            if not path.is_file():
+                raise FileNotFoundError(f"missing view asset: {path}")
 
     worker_script = Path(__file__).resolve().parent / "workers" / "instantstyle_worker.py"
     result: dict[str, dict[str, dict[str, str]] | float | str] = {
@@ -123,7 +127,9 @@ def run_step(
             seed=seed,
             strength=strength,
         )
-        runner(cmd, env={"HF_ENDPOINT": "https://hf-mirror.com", "OMP_NUM_THREADS": "1"})
+        worker_env = huggingface_cache_env()
+        worker_env.update({"HF_ENDPOINT": "https://hf-mirror.com", "OMP_NUM_THREADS": "1"})
+        runner(cmd, env=worker_env)
         if not output_image.is_file():
             raise FileNotFoundError(f"missing stylized output: {output_image}")
         with Image.open(output_image) as stylized_image, Image.open(mask_image) as mask_source:

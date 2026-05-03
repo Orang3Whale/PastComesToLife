@@ -4,6 +4,7 @@ from pathlib import Path
 from PIL import Image
 
 from lib.io_paths import create_run_tree, write_json
+from lib.subprocess_utils import huggingface_cache_env
 from scripts.step3_instantstyle import build_instantstyle_command, run_step
 
 
@@ -117,7 +118,11 @@ def test_run_step_writes_rgb_control_and_strength_into_manifest(tmp_path: Path) 
     assert copied_style.is_file()
     assert copied_style.read_bytes() == style_image.read_bytes()
     assert prompt_file.read_text(encoding="utf-8") == "ceramic mug"
-    assert seen["env"] == {"HF_ENDPOINT": "https://hf-mirror.com", "OMP_NUM_THREADS": "1"}
+    assert seen["env"] == {
+        **huggingface_cache_env(),
+        "HF_ENDPOINT": "https://hf-mirror.com",
+        "OMP_NUM_THREADS": "1",
+    }
     assert "--rgb-image" in seen["cmd"]
     assert "--control-image" in seen["cmd"]
     assert "--strength" in seen["cmd"]
@@ -137,6 +142,47 @@ def test_run_step_writes_rgb_control_and_strength_into_manifest(tmp_path: Path) 
         assert stylized.mode == "RGBA"
         assert stylized.getpixel((0, 0))[3] == 0
         assert stylized.getpixel((3, 3))[3] == 255
+
+
+def test_run_step_rejects_missing_view_asset_before_worker(tmp_path: Path) -> None:
+    paths = create_run_tree(tmp_path / "run")
+    write_json(
+        paths.views / "manifest.json",
+        {
+            "views": [
+                {
+                    "name": name,
+                    "rgb_path": str(paths.views / name / "rgb.png"),
+                    "control_path": str(paths.views / name / "control.png"),
+                    "mask_path": str(paths.views / name / "mask.png"),
+                }
+                for name in ("front", "back", "left", "right", "top", "bottom")
+            ]
+        },
+    )
+    style_image = tmp_path / "style.jpg"
+    Image.new("RGB", (8, 8), "blue").save(style_image)
+    called = False
+
+    def fake_runner(*args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        nonlocal called
+        called = True
+
+    try:
+        run_step(
+            run_dir=paths.root,
+            instantstyle_python=Path("/envs/instantstyle/bin/python"),
+            style_image=style_image,
+            prompt="ceramic mug",
+            seed=123,
+            runner=fake_runner,
+        )
+    except FileNotFoundError as exc:
+        assert "missing view asset" in str(exc)
+    else:
+        raise AssertionError("expected FileNotFoundError for missing view asset")
+
+    assert called is False
 
 
 def test_run_step_rejects_empty_view_manifest(tmp_path: Path) -> None:

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from lib.io_paths import create_run_tree, write_json
+from lib.subprocess_utils import huggingface_cache_env
 from scripts.step2_sf3d import build_sf3d_command, run_step
 from scripts.workers.sf3d_worker import build_model, find_upstream_repo_root
 
@@ -27,6 +28,7 @@ def test_run_step_validates_mesh_output(tmp_path: Path) -> None:
     def fake_runner(cmd, env=None):  # noqa: ANN001
         nonlocal seen_env
         seen_env = dict(env or {})
+        assert seen_env == {**huggingface_cache_env(), "HF_ENDPOINT": "https://hf-mirror.com"}
         assert seen_env["HF_ENDPOINT"] == "https://hf-mirror.com"
         fake_mesh.write_bytes(b"glb")
         write_json(paths.sf3d / "sf3d_meta.json", {"cmd": cmd})

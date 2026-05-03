@@ -54,18 +54,30 @@ def test_build_pipeline_and_adapter_uses_img2img_pipeline(monkeypatch) -> None:
         def enable_vae_tiling(self) -> None:
             seen["vae_tiling"] = True
 
-    monkeypatch.setattr(worker.ControlNetModel, "from_pretrained", lambda *args, **kwargs: FakeControlNet())
+    def fake_controlnet_from_pretrained(model_id, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        seen["controlnet_model_id"] = model_id
+        return FakeControlNet()
+
+    monkeypatch.setattr(worker.ControlNetModel, "from_pretrained", fake_controlnet_from_pretrained)
     monkeypatch.setattr(
         worker.StableDiffusionXLControlNetImg2ImgPipeline,
         "from_pretrained",
         lambda *args, **kwargs: FakePipeline(),
     )
-    monkeypatch.setattr(worker, "IPAdapterXL", lambda pipe, *args, **kwargs: pipe)
+    def fake_ip_adapter(pipe, image_encoder_path, ip_ckpt, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        seen["image_encoder_path"] = image_encoder_path
+        seen["ip_ckpt"] = ip_ckpt
+        return pipe
+
+    monkeypatch.setattr(worker, "IPAdapterXL", fake_ip_adapter)
 
     pipe, ip_model = build_pipeline_and_adapter(device="cpu")
 
     assert seen["pipeline_device"] == "cpu"
     assert seen["controlnet_device"] == "cpu"
+    assert seen["controlnet_model_id"] == "diffusers/controlnet-canny-sdxl-1.0"
+    assert seen["image_encoder_path"].endswith("/sdxl_models/image_encoder")
+    assert seen["ip_ckpt"].endswith("/sdxl_models/ip-adapter_sdxl.bin")
     assert seen["vae_tiling"] is True
     assert pipe is ip_model
 

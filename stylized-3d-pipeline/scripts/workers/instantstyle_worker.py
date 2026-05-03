@@ -8,6 +8,8 @@ from typing import Callable
 
 from PIL import Image
 
+CONTROLNET_MODEL_ID = "diffusers/controlnet-canny-sdxl-1.0"
+
 try:  # pragma: no cover - exercised through monkeypatched tests
     from diffusers import ControlNetModel, StableDiffusionXLControlNetImg2ImgPipeline
 except Exception:  # pragma: no cover - dependency is provided in the worker env
@@ -72,9 +74,11 @@ def build_pipeline_and_adapter(
     ip_adapter_cls: Callable[..., object] | None = None,
 ) -> tuple[object, object]:
     import torch  # noqa: WPS433
+    project_root = Path(__file__).resolve().parents[2]
+    model_root = project_root / "sdxl_models"
 
     controlnet = ControlNetModel.from_pretrained(
-        "diffusers/controlnet-depth-sdxl-1.0",
+        CONTROLNET_MODEL_ID,
         use_safetensors=False,
         torch_dtype=torch.float16,
     ).to(device)
@@ -88,8 +92,8 @@ def build_pipeline_and_adapter(
     adapter_cls = ip_adapter_cls or IPAdapterXL
     ip_model = adapter_cls(
         pipe,
-        "sdxl_models/image_encoder",
-        "sdxl_models/ip-adapter_sdxl.bin",
+        str(model_root / "image_encoder"),
+        str(model_root / "ip-adapter_sdxl.bin"),
         device,
         target_blocks=["up_blocks.0.attentions.1"],
     )
