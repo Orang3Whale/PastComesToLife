@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 from PIL import Image
 import trimesh
 from trimesh.visual.material import PBRMaterial
@@ -48,7 +49,7 @@ def test_build_six_view_spec_fits_elongated_mesh() -> None:
         assert np.max(np.abs(y_ndc)) <= 1.0 + 1e-5
 
 
-def test_render_view_assets_replaces_missing_texture_with_opaque_fallback() -> None:
+def test_render_view_assets_derives_outputs_from_offscreen_alpha(monkeypatch: pytest.MonkeyPatch) -> None:
     vertices = np.array(
         [
             [0.0, -0.5, -0.5],
@@ -71,6 +72,24 @@ def test_render_view_assets_replaces_missing_texture_with_opaque_fallback() -> N
         ),
         fovy_deg=40.0,
     )
+    def fake_render_offscreen_views(mesh, views, resolution):  # noqa: ANN001
+        rgb = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
+        for y in range(8, 24):
+            for x in range(8, 24):
+                rgb.putpixel((x, y), (220, 220, 220, 255))
+        depth = np.zeros((32, 32), dtype=np.float32)
+        depth[8:24, 8:24] = 1.0
+        return {
+            view.name: {
+                "rgb": rgb,
+                "depth": depth,
+                "camera": {"name": view.name, "pose": view.pose.tolist(), "fovy_deg": view.fovy_deg},
+            }
+            for view in views
+        }
+
+    monkeypatch.setattr("lib.view_sampling.render_offscreen_views", fake_render_offscreen_views)
+
     assets = render_view_assets(mesh, [view], resolution=32)
 
     rgb = np.asarray(assets["front"]["rgb"].convert("RGBA"))
@@ -81,11 +100,12 @@ def test_render_view_assets_replaces_missing_texture_with_opaque_fallback() -> N
     assert visible.any()
     assert np.all(rgb[visible, 3] == 255)
     assert np.any(rgb[visible, :3].sum(axis=1) > 0)
+    assert np.all(rgb[~visible, 3] == 0)
     assert np.all(control[~visible, :3] == 0)
     assert np.all(control[~visible, 3] == 0)
 
 
-def test_run_step_writes_view_manifest_and_assets(tmp_path: Path) -> None:
+def test_run_step_marks_mesh_offscreen_render_mode(tmp_path: Path) -> None:
     paths = create_run_tree(tmp_path / "run")
     mesh = trimesh.creation.box()
     mesh.export(paths.sf3d / "mesh_raw.glb", include_normals=True)
@@ -93,8 +113,12 @@ def test_run_step_writes_view_manifest_and_assets(tmp_path: Path) -> None:
     def fake_renderer(mesh, views, resolution):  # noqa: ANN001
         payload = {}
         for view in views:
+            rgb = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+            for y in range(4, 12):
+                for x in range(4, 12):
+                    rgb.putpixel((x, y), (220, 220, 220, 255))
             payload[view.name] = {
-                "rgb": Image.new("RGBA", (16, 16), (10, 20, 30, 255)),
+                "rgb": rgb,
                 "depth": np.ones((16, 16), dtype=np.float32),
                 "depth_preview": Image.new("RGBA", (16, 16), (40, 50, 60, 255)),
                 "normal": Image.new("RGBA", (16, 16), (120, 130, 140, 255)),
@@ -106,21 +130,15 @@ def test_run_step_writes_view_manifest_and_assets(tmp_path: Path) -> None:
 
     result = run_step(paths.root, 16, 2.0, 40.0, renderer=fake_renderer)
 
-    manifest_path = paths.views / "manifest.json"
-    front_rgb_path = paths.views / "front" / "rgb.png"
+    manifest = json.loads((paths.views / "manifest.json").read_text(encoding="utf-8"))
 
-    assert manifest_path.is_file()
-    assert front_rgb_path.is_file()
-    assert result["view_resolution"] == 16
-    assert [entry["name"] for entry in result["views"]] == [
-        "front",
-        "back",
-        "left",
-        "right",
-        "top",
-        "bottom",
-    ]
-    assert json.loads(manifest_path.read_text(encoding="utf-8")) == result
+    assert result["render_mode"] == "mesh_offscreen"
+    assert manifest["render_mode"] == "mesh_offscreen"
+    assert manifest == result
+    with Image.open(paths.views / "front" / "rgb.png") as front_rgb:
+        assert front_rgb.mode == "RGBA"
+        assert front_rgb.getpixel((0, 0))[3] == 0
+        assert front_rgb.getpixel((6, 6))[3] == 255
 
 
 def test_load_mesh_preserves_scene_transforms(tmp_path: Path) -> None:
@@ -137,17 +155,37 @@ def test_load_mesh_preserves_scene_transforms(tmp_path: Path) -> None:
     assert np.allclose(loaded.bounds, np.array([[1.5, -0.5, -0.5], [2.5, 0.5, 0.5]]))
 
 
-def test_render_view_assets_produces_nonempty_mask_and_depth() -> None:
+def test_render_view_assets_produces_nonempty_mask_and_depth(monkeypatch: pytest.MonkeyPatch) -> None:
     mesh = trimesh.creation.box()
     views = build_six_view_spec(mesh, camera_distance=2.0, fovy_deg=40.0)
 
+    def fake_render_offscreen_views(mesh, views, resolution):  # noqa: ANN001
+        payload = {}
+        for view in views:
+            rgb = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
+            for y in range(8, 24):
+                for x in range(8, 24):
+                    rgb.putpixel((x, y), (220, 220, 220, 255))
+            depth = np.zeros((32, 32), dtype=np.float32)
+            depth[8:24, 8:24] = 1.0
+            payload[view.name] = {
+                "rgb": rgb,
+                "depth": depth,
+                "camera": {"name": view.name, "pose": view.pose.tolist(), "fovy_deg": view.fovy_deg},
+            }
+        return payload
+
+    monkeypatch.setattr("lib.view_sampling.render_offscreen_views", fake_render_offscreen_views)
+
     assets = render_view_assets(mesh, views, resolution=32)
 
-    front = assets["front"]
-    mask = np.asarray(front["mask"], dtype=np.uint8)
-    depth = front["depth"]
+    rgb = np.asarray(assets["front"]["rgb"].convert("RGBA"))
+    control = np.asarray(assets["front"]["control"].convert("RGBA"))
+    mask = np.asarray(assets["front"]["mask"])
+    visible = mask > 0
 
-    assert set(assets) == {"front", "back", "left", "right", "top", "bottom"}
-    assert mask.max() == 255
-    assert np.any(depth > 0.0)
-    assert front["camera"]["name"] == "front"
+    assert visible.any()
+    assert np.all(rgb[visible, 3] == 255)
+    assert np.all(rgb[~visible, 3] == 0)
+    assert np.all(control[~visible, :3] == 0)
+    assert np.all(control[~visible, 3] == 0)

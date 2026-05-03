@@ -156,6 +156,58 @@ def test_load_view_samples_reads_manifests_and_assets(tmp_path: Path) -> None:
     assert samples[0].depth.shape == (8, 8)
 
 
+def test_load_view_samples_ignores_render_mode_field(tmp_path: Path) -> None:
+    paths = create_run_tree(tmp_path / "run")
+    write_json(
+        paths.views / "manifest.json",
+        {
+            "render_mode": "mesh_offscreen",
+            "views": [
+                {
+                    "name": name,
+                    "control_path": f"{name}/control.png",
+                    "camera_path": f"{name}/camera.json",
+                    "depth_path": f"{name}/depth.npy",
+                }
+                for name in ("front", "back", "left", "right", "top", "bottom")
+            ],
+            "camera_fovy_deg": 40.0,
+        },
+    )
+    write_json(
+        paths.stylize / "manifest.json",
+        {
+            "views": {
+                name: {
+                    "control_path": f"{name}/control.png",
+                    "stylized_path": f"{name}/stylized.png",
+                }
+                for name in ("front", "back", "left", "right", "top", "bottom")
+            },
+        },
+    )
+    for name in ("front", "back", "left", "right", "top", "bottom"):
+        (paths.views / name).mkdir(parents=True, exist_ok=True)
+        (paths.stylize / name).mkdir(parents=True, exist_ok=True)
+        Image.new("RGBA", (8, 8), (0, 0, 0, 255)).save(paths.views / name / "control.png")
+        Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(paths.stylize / name / "stylized.png")
+        np.save(paths.views / name / "depth.npy", np.ones((8, 8), dtype=np.float32))
+        (paths.views / name / "camera.json").write_text(
+            json.dumps({"name": name, "pose": np.eye(4, dtype=np.float32).tolist(), "fovy_deg": 40.0}, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+
+    samples = load_view_samples(
+        json.loads((paths.views / "manifest.json").read_text(encoding="utf-8")),
+        json.loads((paths.stylize / "manifest.json").read_text(encoding="utf-8")),
+        views_root=paths.views,
+        stylize_root=paths.stylize,
+    )
+
+    assert [sample.name for sample in samples] == ["front", "back", "left", "right", "top", "bottom"]
+    assert samples[0].stylized.size == (8, 8)
+
+
 def test_load_view_samples_resolves_relative_run_paths_against_cwd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     paths = create_run_tree(Path("runs/run"))
