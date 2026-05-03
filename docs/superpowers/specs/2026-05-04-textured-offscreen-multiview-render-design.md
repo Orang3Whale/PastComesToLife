@@ -1,228 +1,189 @@
-# 带纹理离屏多视角渲染设计
+# Step3 双输入风格化设计
 
 ## 1. 背景
 
-当前 `sample_views` 已经从旧的 Python UV 采样路径切换到 `pyrender` 离屏渲染，但默认渲染前会调用 `build_neutral_render_mesh()`，把 `mesh.visual` 替换成统一浅灰顶点色。因此 `views/*/rgb.png` 是干净白模，而不是 SF3D mesh 在可视化器中看到的带纹理外观。
+当前离屏多视角已经能直接渲染 textured mesh，`camera_views.build_six_view_spec()` 也会按主体包围盒自动把相机拉远到能装下整个物体。问题不在视角，而在 step3 的输入方式。
 
-这解决了旧路径的大面积黑块问题，但带来新的质量问题：白模视角缺少原始纹理、材质和颜色边界，后续风格化每个视角会更依赖生成模型自行补全，视角间外观更容易不一致。
+现在 `step3_instantstyle.py` 只把 `control.png` 送进 worker，worker 再对它做 Canny。这样纹理信息没有进入 SD 的主输入通道，`rgb.png` 只能停留在中间产物，导致风格化仍然容易碎、乱、视角间不一致。
 
-另一个关键事实是：`step3_instantstyle.py` 当前不读取 `views/*/rgb.png`。它读取 `views/*/control.png`，worker 再对 `control.png` 做 Canny，作为 ControlNet 条件。因此只把 `rgb.png` 改成带纹理还不够；如果 `control.png` 仍然只由 depth/normal 组成，InstantStyle 仍然看不到纹理边缘。
+新的路线要把责任拆开：
+
+- `rgb.png` 负责提供 Stable Diffusion 的底图。
+- `control.png` 只负责物理骨架和大结构，不承载纹理，也不再做 Canny。
 
 ## 2. 目标
 
-- 默认多视角 RGB 改为直接离屏渲染原始 textured mesh，而不是中性白模。
-- 背景仍严格透明，主体外 alpha 为 0。
-- 主体内部的 atlas 黑洞只做局部修补，不整视角回退白模。
-- `control.png` 改为携带修补后的纹理/颜色边缘，让 InstantStyle 的 Canny 条件能看到原始外观结构。
-- 保留 depth/normal 的几何约束，避免纯纹理边缘导致结构漂移。
-- 输出 manifest 明确记录新的渲染模式和每个视角的修补统计。
-- 不新增模型下载，不使用生成式 inpainting。
+- step3 支持同时读取 `rgb.png` 和 `control.png`。
+- `rgb.png` 作为 SDXL img2img 的 init image，保留原始纹理和颜色分布。
+- `control.png` 只表达几何骨架、轮廓和体块，不依赖纹理边缘。
+- worker 不再对 `control.png` 做 Canny。
+- 默认重绘幅度保持中低档，建议 `strength=0.45`，可配置到 `0.35-0.55`。
+- 继续保留背景透明和 mask 约束。
+- 不新增模型下载，不重做 step4 回烘逻辑。
 
 ## 3. 非目标
 
-- 不在本阶段重写 `step4_retexture` 的 UV 回烘算法。
-- 不保证和浏览器 viewer 像素级一致；目标是让离屏输入和 viewer 同源，即使用同一个 textured mesh/material。
-- 不解决所有合法黑色材质的语义判断问题；黑洞修补采用保守阈值和统计输出，避免静默大范围改色。
-- 不改变 `step3_instantstyle.py` 的外部 CLI。
+- 不在本阶段重写 `step4_retexture`。
+- 不在本阶段更换成新的控制模型家族，先保持当前缓存可用的 SDXL ControlNet + IP-Adapter 路线。
+- 不改变 step3 的顶层 CLI 入口，只扩展内部 view manifest 和 worker 参数。
 
 ## 4. 推荐方案
 
-使用“textured offscreen render + foreground-only black-hole repair + texture-aware control”的单一路线。
+采用“`rgb.png` 作为 img2img 底图 + `control.png` 作为几何控制图”的双输入方案。
 
-### 4.1 textured offscreen render
+### 4.1 视图阶段
 
-`lib/offscreen_renderer.py` 的主路径不再调用 `build_neutral_render_mesh()`。渲染时直接将原始 `trimesh.Trimesh` 传给 `pyrender.Mesh.from_trimesh(mesh, smooth=False)`，保留 `TextureVisuals`、`baseColorTexture`、UV 和材质颜色。
+`lib/view_sampling.py` 继续写出 `rgb.png`、`depth.png`、`normal.png`、`mask.png` 和 `control.png`，但职责要重新划分：
 
-`build_neutral_render_mesh()` 可以保留为测试或诊断 helper，但不能再作为默认 `render_offscreen_view()` 的颜色来源。
+- `rgb.png` 保存修补后的 textured render。
+- `control.png` 只从 `depth`、`normal`、`mask` 生成结构图，不再混入纹理颜色。
+- `control.png` 的目标是锁定主体姿态、外轮廓、体块转折和局部几何，不是复原材质。
 
-### 4.2 黑洞检测
+推荐的 `control.png` 组成方式：
 
-离屏渲染后，继续用 depth buffer 生成 foreground mask：
+- 前景 mask 提供主体轮廓。
+- depth 提供体块层次。
+- normal 提供朝向变化。
+- 不使用 `rgb.png` 参与控制图构造。
 
-- `foreground = depth > 0`
-- 背景 alpha 始终为 0。
-- 黑洞候选只允许出现在 foreground 内。
+### 4.2 step3 输入
 
-黑洞候选规则：
+`views/manifest.json` 需要新增 `rgb_path`，每个视角至少包含：
 
-- 像素 alpha 在 foreground 内。
-- RGB 亮度低于固定低阈值，例如 `luma < 18`。
-- 候选像素周围存在非黑 foreground 邻域，说明这是局部洞而不是整块真实黑材质。
+- `rgb_path`
+- `control_path`
+- `mask_path`
 
-每个视角记录：
+`scripts/step3_instantstyle.py` 读取这两个输入后，构造 worker 命令时同时传入 `--rgb-image` 和 `--control-image`。
 
-- `foreground_pixel_count`
-- `black_hole_pixel_count_before`
-- `black_hole_ratio_before`
-- `black_hole_pixel_count_after`
-- `black_hole_ratio_after`
+### 4.3 worker 路线
 
-如果某个视角 foreground 内黑洞比例异常高，仍然保留 textured render 和局部修补结果，但在 manifest 中记录高比例，不自动整视角白模回退。
+`scripts/workers/instantstyle_worker.py` 改为使用 `StableDiffusionXLControlNetImg2ImgPipeline`，而不是纯 ControlNet txt2img。
 
-### 4.3 局部修补
+运行时输入分成三层：
 
-修补只发生在 foreground 内的黑洞候选区域：
+- `pil_image` 仍然是 style reference。
+- `image=rgb.png` 作为 init image。
+- `control_image=control.png` 作为几何约束。
 
-- 背景透明像素不参与修补。
-- 有效 foreground 非黑像素作为颜色源。
-- 使用最近有效 foreground 像素填充黑洞，优先采用 `scipy.ndimage.distance_transform_edt` 的 nearest valid fill。
-- 如果没有有效颜色源，保持原像素并记录修补失败统计。
+核心参数建议：
 
-这不是生成式 inpainting，只是局部颜色传播，目标是消除 atlas 空洞对风格化条件的破坏。
+- `strength=0.45`
+- `controlnet_conditioning_scale=0.7`
+- `num_inference_steps=30`
 
-### 4.4 texture-aware control
+`control.png` 直接送进 pipeline，不再经过 `cv2.Canny`。
 
-当前 `control.png` 由 normal/depth 组合生成，然后 worker 对它做 Canny。新设计改为 texture-aware control：
+### 4.4 背景处理
 
-- 主输入：修补后的 textured RGB。
-- 辅助输入：depth preview 和 normal RGB。
-- 输出仍为 `control.png`，alpha 仍为 foreground mask。
+因为 img2img 会把输入图当作可见底图，`rgb.png` 在进入 pipeline 前应当先做一次透明背景处理：
 
-推荐控制图组合：
+- 前景按原纹理保留。
+- 透明区域使用中性背景填充，避免黑底污染扩散到主体边缘。
+- `control.png` 在进入 pipeline 前也要用 alpha 变成纯结构的 RGB 图，背景统一压成黑底或近黑底，避免透明通道在不同库里被不一致解释。
 
-- RGB 主导，用于保留原始纹理和颜色边界。
-- normal/depth 轻量混入，用于保留几何轮廓和大结构。
-- 背景 RGB 和 alpha 都为 0。
-
-这样不需要改 `step3_instantstyle.py` 的 CLI 或 worker 输入路径；worker 继续对 `control.png` 做 Canny，但 Canny 的边缘来源将包含纹理、材质和几何。
+输出后仍按当前逻辑用 `mask.png` 恢复 alpha。
 
 ## 5. 数据流
 
-1. `step3_sample_views.py` 加载 `sf3d/mesh_raw.glb`。
-2. `camera_views.build_six_view_spec()` 计算六个自适应视角。
-3. `view_sampling.render_view_assets()` 调用 textured offscreen renderer。
-4. `offscreen_renderer.render_offscreen_view()` 输出：
-   - raw textured color buffer
-   - depth buffer
-   - alpha mask
-   - black-hole repair stats
-5. `view_sampling._derive_secondary_maps()` 使用修补后的 textured RGB 派生：
-   - `rgb.png`
-   - `depth.npy`
-   - `depth.png`
-   - `normal.png`
-   - `mask.png`
-   - texture-aware `control.png`
-6. `views/manifest.json` 写入：
-   - `render_mode: "mesh_textured_offscreen"`
-   - 每个视角的资产路径
-   - 每个视角的 black-hole 修补统计
-7. `step3_instantstyle.py` 不改入口，继续读取 `control.png` 和 `mask.png`。
-8. `step4_retexture.py` 不改入口，继续读取 stylized views 和 depth。
+1. `step3_sample_views.py` 用自适应相机导出六视角。
+2. `view_sampling.py` 写出 textured `rgb.png` 和 geometry-only `control.png`。
+3. `views/manifest.json` 记录 `rgb_path`、`control_path`、`mask_path`。
+4. `step3_instantstyle.py` 读取两个图像路径并启动 worker。
+5. `instantstyle_worker.py` 用 `rgb.png` 做 img2img 底图，用 `control.png` 锁骨架。
+6. 输出的 `stylized.png` 继续按 mask 恢复透明背景。
+7. `step4_retexture.py` 保持不变，继续读取 stylized views。
 
 ## 6. 文件职责
 
-### 6.1 `lib/offscreen_renderer.py`
+### 6.1 `lib/view_sampling.py`
 
-负责真实 mesh 离屏渲染和黑洞修补。
+- 保持 textured RGB 输出。
+- 新增或调整 `control.png` 构造逻辑，使其只依赖几何信息。
+- 不再让 `control.png` 参与纹理表达。
 
-新增或调整职责：
+### 6.2 `scripts/step3_instantstyle.py`
 
-- 默认渲染保留原始 textured material。
-- 提供 foreground-only 黑洞检测。
-- 提供 foreground-only 最近邻颜色修补。
-- 返回修补统计。
-- 保留明确的 EGL/OSMesa/OpenGL 错误信息。
+- 读取 `rgb_path` 和 `control_path`。
+- 构造 worker 命令时同时传入 `--rgb-image` 与 `--control-image`。
+- 保持外部 CLI 不变。
 
-### 6.2 `lib/view_sampling.py`
+### 6.3 `scripts/workers/instantstyle_worker.py`
 
-负责把 renderer 输出转换成现有资产 bundle。
+- 将底模切到 `StableDiffusionXLControlNetImg2ImgPipeline`。
+- 去掉 `build_canny_control_map()` 这条路径。
+- 让 `rgb.png` 成为真正的 init image。
 
-新增或调整职责：
+### 6.4 `views/manifest.json`
 
-- 使用修补后的 textured RGB 作为 `rgb.png`。
-- 用 textured RGB + normal/depth 生成 texture-aware `control.png`。
-- 保持 `depth.png`、`normal.png`、`mask.png` 背景透明。
-
-### 6.3 `scripts/step3_sample_views.py`
-
-继续作为步骤编排入口。
-
-新增或调整职责：
-
-- manifest 的 `render_mode` 更新为 `mesh_textured_offscreen`。
-- 将每个视角的修补统计写入 manifest。
-
-### 6.4 `step3_instantstyle.py`
-
-不改变外部接口。
-
-它仍读取 `control.png`，但由于 `control.png` 本身变成 texture-aware，InstantStyle 的 Canny 条件会获得原始纹理/材质边缘。
+- 新增 `rgb_path`。
+- 保留 `control_path` 和 `mask_path`。
+- 可选记录 `strength`、`control_scale`，方便回看 run 参数。
 
 ## 7. 测试策略
 
-### 7.1 renderer 单元测试
+### 7.1 step3 命令测试
 
-- 构造带纹理 mesh，验证默认 render path 不调用 `build_neutral_render_mesh()`。
-- fake renderer 返回 foreground 内黑块，验证黑洞区域被局部修补。
-- 验证透明背景不被修补，alpha 仍为 0。
-- 验证修补统计包含 before/after 黑洞比例。
-- 验证重复 view name 和 renderer cleanup 行为继续有效。
+- `build_instantstyle_command()` 必须同时包含 `--rgb-image` 和 `--control-image`。
+- `run_step()` 读取 manifest 时必须校验 `rgb_path`、`control_path`、`mask_path` 都存在。
 
-### 7.2 view sampling 单元测试
+### 7.2 worker 行为测试
 
-- fake offscreen 输出带彩色纹理边缘，验证 `rgb.png` 保留颜色。
-- 验证 `control.png` 包含 textured RGB 信息，而不是只包含 normal/depth。
-- 验证 `control.png`、`depth.png`、`normal.png` 背景 alpha 为 0。
-- 验证 manifest 为 `mesh_textured_offscreen` 并包含修补统计。
+- fake pipeline 要能收到 `image=rgb` 和 `control_image=control`。
+- fake pipeline 要能收到 `strength`。
+- 不能再出现 `cv2.Canny()` 调用。
 
-### 7.3 instantstyle 回归测试
+### 7.3 control 图测试
 
-- 不改 CLI。
-- 现有 worker 的 `build_canny_control_map()` 继续只接收 `control.png`。
-- 增加测试证明 masked background 不会进入 Canny。
+- `control.png` 不得依赖 `rgb.png` 的颜色纹理。
+- `control.png` 背景仍应保持透明或前景掩码一致。
+- `control.png` 的高响应区域应集中在主体轮廓和结构转折。
 
-### 7.4 真实样例验证
+### 7.4 集成回归
 
-在 `runs/real-chair-starry-multiview-v2` 上重跑：
+在现有 run 上重跑：
 
 1. `step3_sample_views.py`
 2. `step3_instantstyle.py`
 3. `step4_retexture.py`
 4. `step5_build_viewer.py`
 
-记录：
+关注：
 
-- `views/*/rgb.png` foreground 内 black ratio before/after repair。
-- `views/*/control.png` foreground 内 edge density。
-- `stylize/*/stylized.png` alpha 是否严格匹配 mask。
-- `retexture/texture_preview.png` dark ratio。
+- `views/*/rgb.png` 是否保留完整纹理。
+- `views/*/control.png` 是否只表达骨架。
+- `stylize/*/stylized.png` 是否比纯 control Canny 方案更完整、更少碎块。
 
 ## 8. 风险与缓解
 
-### 8.1 合法黑色材质被误判为黑洞
+### 8.1 img2img 强度过高
 
-风险：真实黑色纹理也可能被修补。
+风险：底图纹理被重新绘制掉。
 
-缓解：
+缓解：默认把 `strength` 压在 0.45 左右，并保留可调范围。
 
-- 黑洞检测只修补 foreground 内的局部低亮度区域。
-- 输出每个视角的修补比例。
-- 如果修补比例异常高，记录 warning stats，而不是静默白模回退。
+### 8.2 control 图太弱
 
-### 8.2 texture-aware control 过度约束风格化
+风险：几何约束不足，视角间变形。
 
-风险：Canny 捕获太多纹理细节，可能让风格化变碎。
+缓解：`control.png` 只锁骨架，但它必须由轮廓、depth、normal 共同组成，而不是单纯灰图。
 
-缓解：
+### 8.3 透明背景引入黑边
 
-- `control.png` 采用 RGB 主导但混入 normal/depth，第一版避免多路 ControlNet。
-- 如果真实 run 显示边缘过密，后续可调低 RGB 权重或先轻度平滑 RGB，再生成 control。
+风险：PIL / diffusers 在读 RGBA 时把透明区处理成黑底。
 
-### 8.3 textured render 仍与 viewer 不完全一致
+缓解：进入 pipeline 前先做中性背景填充，输出后再恢复 alpha。
 
-风险：`pyrender` 与浏览器 viewer 的 tone mapping、材质模型不同。
+### 8.4 现有 ControlNet 与几何图不完全匹配
 
-缓解：
+风险：当前缓存的是 canny ControlNet，几何图效果可能不是最优。
 
-- 本设计要求保留 mesh material 和 texture source，不要求像素级一致。
-- 验收指标以黑洞比例、透明背景和风格化一致性为主。
+缓解：先把输入链路改对，避免 Canny 绑死纹理；如果后续仍然不稳，再考虑切换到 depth/normal ControlNet。
 
 ## 9. 成功标准
 
-- `views/*/rgb.png` 不再是白模，而是保留原始 mesh 纹理/颜色。
-- `views/*/rgb.png` foreground 内黑块比例经修补后显著降低。
-- `control.png` 不是纯几何 control，而是包含修补后的纹理/颜色边缘。
-- 背景透明不回归。
-- `step3_instantstyle.py` 和 `step4_retexture.py` 外部入口保持兼容。
-- 聚焦测试通过，并且真实 run 完整跑通。
+- `step3` 同时读取 `rgb.png` 和 `control.png`。
+- `control.png` 不再承担纹理职责，也不再做 Canny。
+- `rgb.png` 作为 img2img 底图真正进入 Stable Diffusion。
+- 生成结果相较原方案更完整、更少黑块和碎片化。
+- 现有相机自适应和 step4 流程不被破坏。
