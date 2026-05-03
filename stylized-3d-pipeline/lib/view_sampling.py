@@ -53,11 +53,12 @@ def _derive_secondary_maps(rgb: Image.Image | np.ndarray, depth: np.ndarray, fov
     normal_rgb = np.uint8(np.clip((normal_xyz / denom + 1.0) * 127.5, 0, 255))
     normal_rgb = np.where(mask[:, :, None] > 0, normal_rgb, 0).astype(np.uint8)
     normal = Image.fromarray(np.dstack([normal_rgb, mask]), mode="RGBA")
+    depth_rgba = np.dstack([np.repeat(depth_preview_u8[:, :, None], 3, axis=2), mask])
 
     return {
         "rgb": Image.fromarray(rgba_array, mode="RGBA"),
         "depth": valid_depth,
-        "depth_preview": Image.fromarray(depth_preview_u8, mode="L").convert("RGBA"),
+        "depth_preview": Image.fromarray(depth_rgba, mode="RGBA"),
         "normal": normal,
         "mask": Image.fromarray(mask, mode="L"),
         "control": _make_control_image(normal_rgb, depth_preview_u8, mask),

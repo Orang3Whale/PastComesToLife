@@ -93,6 +93,8 @@ def test_render_view_assets_derives_outputs_from_offscreen_alpha(monkeypatch: py
     assets = render_view_assets(mesh, [view], resolution=32)
 
     rgb = np.asarray(assets["front"]["rgb"].convert("RGBA"))
+    depth_preview = np.asarray(assets["front"]["depth_preview"].convert("RGBA"))
+    normal = np.asarray(assets["front"]["normal"].convert("RGBA"))
     control = np.asarray(assets["front"]["control"].convert("RGBA"))
     mask = np.asarray(assets["front"]["mask"])
     visible = mask > 0
@@ -101,6 +103,8 @@ def test_render_view_assets_derives_outputs_from_offscreen_alpha(monkeypatch: py
     assert np.all(rgb[visible, 3] == 255)
     assert np.any(rgb[visible, :3].sum(axis=1) > 0)
     assert np.all(rgb[~visible, 3] == 0)
+    assert np.all(depth_preview[~visible, 3] == 0)
+    assert np.all(normal[~visible, 3] == 0)
     assert np.all(control[~visible, :3] == 0)
     assert np.all(control[~visible, 3] == 0)
 
