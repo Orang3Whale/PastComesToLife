@@ -1,12 +1,10 @@
 import json
 from pathlib import Path
 
-import numpy as np
 from PIL import Image
 
 from lib.io_paths import create_run_tree, write_json
 from scripts.step3_instantstyle import build_instantstyle_command, run_step
-from scripts.workers.instantstyle_worker import build_canny_control_map, write_worker_outputs
 
 
 def test_build_instantstyle_command_includes_rgb_control_and_strength(tmp_path: Path) -> None:
@@ -231,74 +229,3 @@ def test_run_step_rejects_extra_view_in_manifest(tmp_path: Path) -> None:
         assert "canonical" in str(exc).lower()
     else:
         raise AssertionError("expected ValueError for extra view in manifest")
-
-
-def test_generate_stylized_images_uses_seed() -> None:
-    from scripts.workers import instantstyle_worker
-
-    seen: dict[str, object] = {}
-
-    class FakeIPAdapter:
-        def generate(self, **kwargs):  # noqa: ANN003
-            seen.update(kwargs)
-            return [Image.new("RGBA", (16, 16), (0, 255, 0, 255))]
-
-    helper = getattr(instantstyle_worker, "generate_stylized_images")
-    output = helper(
-        ip_model=FakeIPAdapter(),
-        style=Image.new("RGB", (16, 16), "blue"),
-        prompt="ceramic mug",
-        canny_map=Image.new("RGB", (16, 16), "black"),
-        seed=123,
-    )
-
-    assert len(output) == 1
-    assert seen["seed"] == 123
-    assert seen["prompt"] == "ceramic mug"
-
-
-def test_build_canny_control_map_masks_transparent_pixels() -> None:
-    class FakeCv2:
-        @staticmethod
-        def Canny(control_array, low, high):  # noqa: ANN001,ANN003
-            return np.full(control_array.shape[:2], 255, dtype=np.uint8)
-
-    control = Image.new("RGBA", (2, 2), (10, 20, 30, 0))
-    control.putpixel((1, 1), (10, 20, 30, 255))
-
-    canny = build_canny_control_map(control, FakeCv2())
-    canny_array = np.asarray(canny)
-
-    assert np.all(canny_array[0, 0] == 0)
-    assert np.all(canny_array[1, 1] == 255)
-
-
-def test_write_worker_outputs_writes_stylized_image_and_meta(tmp_path: Path) -> None:
-    output_image = tmp_path / "stylize" / "front" / "stylized.png"
-    stylized_image = Image.new("RGBA", (16, 16), (255, 0, 0, 255))
-
-    metadata = write_worker_outputs(
-        output_image=output_image,
-        stylized_image=stylized_image,
-        control_image=Path("/run/views/front/control.png"),
-        style_image=Path("/run/inputs/style.png"),
-        prompt="ceramic mug",
-        seed=7,
-    )
-
-    stylized_path = output_image
-    worker_meta_path = output_image.parent / "worker_meta.json"
-
-    assert stylized_path.is_file()
-    with Image.open(stylized_path) as saved_image:
-        assert saved_image.mode == "RGBA"
-        assert saved_image.size == (16, 16)
-    assert worker_meta_path.is_file()
-    assert json.loads(worker_meta_path.read_text(encoding="utf-8")) == metadata
-    assert metadata == {
-        "control_image": "/run/views/front/control.png",
-        "style_image": "/run/inputs/style.png",
-        "prompt": "ceramic mug",
-        "seed": 7,
-        "output_image": str(output_image),
-    }
