@@ -62,12 +62,12 @@ def render_offscreen_view(
     resolution: int,
     renderer_factory: Callable[[int, int], object] = pyrender.OffscreenRenderer,
 ) -> dict[str, object]:
+    scene = _make_scene(mesh, view)
     try:
         renderer = renderer_factory(resolution, resolution)
     except Exception as exc:  # noqa: BLE001
         raise RuntimeError(_BACKEND_ERROR) from exc
 
-    scene = _make_scene(mesh, view)
     try:
         color, depth = renderer.render(scene, flags=pyrender.RenderFlags.RGBA)
     except Exception as exc:  # noqa: BLE001
@@ -105,6 +105,12 @@ def render_offscreen_views(
     resolution: int,
     renderer_factory: Callable[[int, int], object] = pyrender.OffscreenRenderer,
 ) -> dict[str, dict[str, object]]:
+    names = [view.name for view in views]
+    duplicate_names = sorted({name for name in names if names.count(name) > 1})
+    if duplicate_names:
+        joined = ", ".join(duplicate_names)
+        raise ValueError(f"duplicate view names are not supported: {joined}")
+
     return {
         view.name: render_offscreen_view(
             mesh,

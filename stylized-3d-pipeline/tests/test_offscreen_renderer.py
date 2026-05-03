@@ -6,7 +6,7 @@ from trimesh.visual.material import PBRMaterial
 from trimesh.visual.texture import TextureVisuals
 
 from lib.camera_views import CameraView, look_at
-from lib.offscreen_renderer import build_neutral_render_mesh, render_offscreen_view
+from lib.offscreen_renderer import build_neutral_render_mesh, render_offscreen_view, render_offscreen_views
 
 
 def _textured_triangle() -> trimesh.Trimesh:
@@ -50,6 +50,13 @@ def test_render_offscreen_view_returns_rgba_color_and_depth() -> None:
         def delete(self) -> None:
             self.deleted = True
 
+    created_renderers: list[FakeRenderer] = []
+
+    def renderer_factory(width: int, height: int) -> FakeRenderer:
+        renderer = FakeRenderer(width, height)
+        created_renderers.append(renderer)
+        return renderer
+
     view = CameraView(
         name="front",
         pose=look_at(
@@ -63,7 +70,7 @@ def test_render_offscreen_view_returns_rgba_color_and_depth() -> None:
         _textured_triangle(),
         view,
         resolution=8,
-        renderer_factory=lambda width, height: FakeRenderer(width, height),
+        renderer_factory=renderer_factory,
     )
 
     assert isinstance(assets["rgb"], Image.Image)
@@ -79,6 +86,23 @@ def test_render_offscreen_view_returns_rgba_color_and_depth() -> None:
     assert rgb[3, 3, 3] == 255
     assert rgb[3, 3, 0] == 220
     assert assets["camera"]["pose"] == view.pose.tolist()
+    assert created_renderers and created_renderers[0].deleted is True
+
+
+def test_render_offscreen_views_rejects_duplicate_names() -> None:
+    mesh = _textured_triangle()
+    view = CameraView(
+        name="front",
+        pose=look_at(
+            np.array([2.0, 0.0, 0.0], dtype=np.float32),
+            np.zeros(3, dtype=np.float32),
+            np.array([0.0, 0.0, 1.0], dtype=np.float32),
+        ),
+        fovy_deg=40.0,
+    )
+
+    with pytest.raises(ValueError, match="duplicate view names"):
+        render_offscreen_views(mesh, [view, view], resolution=8)
 
 
 def test_render_offscreen_view_raises_clear_error_when_backend_missing() -> None:
