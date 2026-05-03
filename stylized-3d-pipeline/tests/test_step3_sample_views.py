@@ -110,7 +110,7 @@ def test_render_view_assets_derives_outputs_from_offscreen_alpha(monkeypatch: py
     assert np.all(control[~visible, 3] == 0)
 
 
-def test_run_step_marks_mesh_offscreen_render_mode(tmp_path: Path) -> None:
+def test_run_step_marks_mesh_textured_offscreen_render_mode(tmp_path: Path) -> None:
     paths = create_run_tree(tmp_path / "run")
     mesh = trimesh.creation.box()
     mesh.export(paths.sf3d / "mesh_raw.glb", include_normals=True)
@@ -137,8 +137,10 @@ def test_run_step_marks_mesh_offscreen_render_mode(tmp_path: Path) -> None:
 
     manifest = json.loads((paths.views / "manifest.json").read_text(encoding="utf-8"))
 
-    assert result["render_mode"] == "mesh_offscreen"
-    assert manifest["render_mode"] == "mesh_offscreen"
+    assert result["render_mode"] == "mesh_textured_offscreen"
+    assert manifest["render_mode"] == "mesh_textured_offscreen"
+    assert manifest["views"][0]["rgb_path"].endswith("/rgb.png")
+    assert manifest["views"][0]["control_path"].endswith("/control.png")
     assert manifest == result
     with Image.open(paths.views / "front" / "rgb.png") as front_rgb:
         assert front_rgb.mode == "RGBA"

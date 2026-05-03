@@ -1,4 +1,5 @@
 import numpy as np
+import pyrender
 import pytest
 import trimesh
 from PIL import Image
@@ -30,6 +31,49 @@ def test_build_neutral_render_mesh_drops_source_texture() -> None:
     assert neutral.visual.kind != "texture"
     assert neutral.visual.vertex_colors.shape[1] == 4
     assert np.all(neutral.visual.vertex_colors[:, :3] == 235)
+
+
+def test_render_offscreen_view_keeps_source_texture(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured = {}
+
+    original_from_trimesh = pyrender.Mesh.from_trimesh
+
+    def fake_from_trimesh(mesh, smooth=False):  # noqa: ANN001, ANN003
+        captured["visual_kind"] = mesh.visual.kind
+        return original_from_trimesh(mesh, smooth=smooth)
+
+    monkeypatch.setattr(pyrender.Mesh, "from_trimesh", fake_from_trimesh)
+
+    class FakeRenderer:
+        def __init__(self, viewport_width: int, viewport_height: int) -> None:
+            self.viewport_width = viewport_width
+            self.viewport_height = viewport_height
+
+        def render(self, scene, flags):  # noqa: ANN001
+            color = np.zeros((self.viewport_height, self.viewport_width, 4), dtype=np.uint8)
+            depth = np.zeros((self.viewport_height, self.viewport_width), dtype=np.float32)
+            return color, depth
+
+        def delete(self) -> None:
+            pass
+
+    view = CameraView(
+        name="front",
+        pose=look_at(
+            np.array([2.0, 0.0, 0.0], dtype=np.float32),
+            np.zeros(3, dtype=np.float32),
+            np.array([0.0, 0.0, 1.0], dtype=np.float32),
+        ),
+        fovy_deg=40.0,
+    )
+    render_offscreen_view(
+        _textured_triangle(),
+        view,
+        resolution=8,
+        renderer_factory=lambda w, h: FakeRenderer(w, h),
+    )
+
+    assert captured["visual_kind"] == "texture"
 
 
 def test_render_offscreen_view_returns_rgba_color_and_depth() -> None:

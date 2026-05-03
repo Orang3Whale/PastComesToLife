@@ -24,7 +24,7 @@ def build_neutral_render_mesh(
 
 def _make_scene(mesh: trimesh.Trimesh, view: CameraView) -> pyrender.Scene:
     scene = pyrender.Scene(bg_color=[0.0, 0.0, 0.0, 0.0], ambient_light=[0.18, 0.18, 0.18])
-    scene.add(pyrender.Mesh.from_trimesh(build_neutral_render_mesh(mesh), smooth=False))
+    scene.add(pyrender.Mesh.from_trimesh(mesh, smooth=False))
     scene.add(pyrender.PerspectiveCamera(yfov=np.deg2rad(view.fovy_deg)), pose=view.pose)
 
     light_transforms = [

@@ -40,7 +40,7 @@ def run_step(
     assets = renderer(mesh, views, view_resolution)
 
     manifest = {
-        "render_mode": "mesh_offscreen",
+        "render_mode": "mesh_textured_offscreen",
         "view_resolution": view_resolution,
         "camera_distance": camera_distance,
         "camera_fovy_deg": camera_fovy_deg,
