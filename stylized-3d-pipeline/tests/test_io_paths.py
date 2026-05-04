@@ -1,0 +1,77 @@
+from datetime import datetime
+from itertools import count
+from pathlib import Path
+
+import pytest
+
+from lib.io_paths import create_run_tree, resolve_run_dir, write_json
+
+
+def test_create_run_tree_creates_expected_directories(tmp_path: Path) -> None:
+    run_dir = resolve_run_dir(tmp_path, "demo-mug")
+    paths = create_run_tree(run_dir)
+
+    assert paths.root == run_dir
+    assert paths.inputs.is_dir()
+    assert paths.preprocess.is_dir()
+    assert paths.sf3d.is_dir()
+    assert paths.views.is_dir()
+    assert paths.stylize.is_dir()
+    assert paths.retexture.is_dir()
+    assert paths.viewer.is_dir()
+
+
+def test_write_json_persists_payload(tmp_path: Path) -> None:
+    out_path = tmp_path / "meta.json"
+    write_json(out_path, {"step": "preprocess", "ok": True})
+    assert out_path.read_text(encoding="utf-8") == '{\n  "ok": true,\n  "step": "preprocess"\n}'
+
+
+def test_resolve_run_dir_uses_utc_timestamp_when_run_name_missing(
+    monkeypatch, tmp_path: Path
+) -> None:
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 4, 30, 12, 34, 56, 789012, tzinfo=tz)
+
+    monkeypatch.setattr("lib.io_paths.datetime", FixedDatetime, raising=False)
+    monkeypatch.setattr("lib.io_paths._anonymous_run_counter", count(), raising=False)
+
+    run_dir = resolve_run_dir(tmp_path, None)
+
+    assert run_dir == tmp_path / "20260430-123456-789012-0000"
+
+
+def test_resolve_run_dir_generates_distinct_anonymous_paths(
+    monkeypatch, tmp_path: Path
+) -> None:
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 4, 30, 12, 34, 56, 789012, tzinfo=tz)
+
+    monkeypatch.setattr("lib.io_paths.datetime", FixedDatetime, raising=False)
+    monkeypatch.setattr("lib.io_paths._anonymous_run_counter", count(), raising=False)
+
+    first = resolve_run_dir(tmp_path, None)
+    second = resolve_run_dir(tmp_path, None)
+
+    assert first == tmp_path / "20260430-123456-789012-0000"
+    assert second == tmp_path / "20260430-123456-789012-0001"
+
+
+@pytest.mark.parametrize(
+    "run_name",
+    ["/tmp/evil", "nested/name"],
+)
+def test_resolve_run_dir_rejects_unsafe_run_names(
+    tmp_path: Path, run_name: str
+) -> None:
+    with pytest.raises(ValueError, match="run_name"):
+        resolve_run_dir(tmp_path, run_name)
+
+
+def test_resolve_run_dir_rejects_empty_run_name(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="run_name"):
+        resolve_run_dir(tmp_path, "")

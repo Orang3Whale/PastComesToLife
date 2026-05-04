@@ -388,6 +388,8 @@
 
 用于保留本次运行的全部显式参数。
 
+`stylized-3d-pipeline/scripts/workers/` 下的 worker 脚本会由编排层通过各自独立的 Python 解释器启动，这样 `SF3D` 和 `InstantStyle` 可以继续使用自己的虚拟环境，而不需要修改上游代码库本身。
+
 ## 9. 命令接口设计
 
 ### 9.1 分步命令
