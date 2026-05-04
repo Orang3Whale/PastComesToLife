@@ -1,4 +1,6 @@
 from pathlib import Path
+from types import ModuleType
+import sys
 
 import numpy as np
 from PIL import Image
@@ -106,6 +108,35 @@ def test_generate_stylized_images_passes_base_image_control_image_and_strength()
     assert seen["strength"] == 0.45
 
 
+def test_generate_stylized_images_passes_custom_style_parameters() -> None:
+    seen = {}
+
+    class FakeIPAdapter:
+        def generate(self, **kwargs):  # noqa: ANN003
+            seen.update(kwargs)
+            return [Image.new("RGBA", (16, 16), (0, 255, 0, 255))]
+
+    output = generate_stylized_images(
+        ip_model=FakeIPAdapter(),
+        style=Image.new("RGB", (16, 16), "blue"),
+        prompt="ceramic mug",
+        base_image=Image.new("RGB", (16, 16), "white"),
+        control_image=Image.new("RGB", (16, 16), "black"),
+        seed=123,
+        strength=0.72,
+        style_scale=1.8,
+        guidance_scale=6.5,
+        num_inference_steps=35,
+        controlnet_conditioning_scale=0.45,
+    )
+
+    assert len(output) == 1
+    assert seen["scale"] == 1.8
+    assert seen["guidance_scale"] == 6.5
+    assert seen["num_inference_steps"] == 35
+    assert seen["controlnet_conditioning_scale"] == 0.45
+
+
 def test_write_worker_outputs_records_dual_inputs_and_strength(tmp_path: Path) -> None:
     output_image = tmp_path / "stylize" / "front" / "stylized.png"
     metadata = write_worker_outputs(
@@ -123,3 +154,91 @@ def test_write_worker_outputs_records_dual_inputs_and_strength(tmp_path: Path) -
     assert metadata["rgb_image"] == "/run/views/front/rgb.png"
     assert metadata["control_image"] == "/run/views/front/control.png"
     assert metadata["strength"] == 0.45
+
+
+def test_write_worker_outputs_records_custom_style_parameters(tmp_path: Path) -> None:
+    output_image = tmp_path / "stylize" / "front" / "stylized.png"
+    metadata = write_worker_outputs(
+        output_image=output_image,
+        stylized_image=Image.new("RGBA", (16, 16), (255, 0, 0, 255)),
+        rgb_image=Path("/run/views/front/rgb.png"),
+        control_image=Path("/run/views/front/control.png"),
+        style_image=Path("/run/inputs/style.png"),
+        prompt="ceramic mug",
+        seed=7,
+        strength=0.72,
+        style_scale=1.8,
+        guidance_scale=6.5,
+        num_inference_steps=35,
+        controlnet_conditioning_scale=0.45,
+    )
+
+    assert metadata["style_scale"] == 1.8
+    assert metadata["guidance_scale"] == 6.5
+    assert metadata["num_inference_steps"] == 35
+    assert metadata["controlnet_conditioning_scale"] == 0.45
+
+
+def test_main_parses_custom_style_parameters(tmp_path: Path, monkeypatch) -> None:
+    rgb = tmp_path / "rgb.png"
+    control = tmp_path / "control.png"
+    style = tmp_path / "style.png"
+    output = tmp_path / "out.png"
+    Image.new("RGBA", (4, 4), (10, 20, 30, 255)).save(rgb)
+    Image.new("RGBA", (4, 4), (0, 0, 0, 255)).save(control)
+    Image.new("RGB", (4, 4), "blue").save(style)
+
+    captured = {}
+    fake_ip_adapter_module = ModuleType("ip_adapter")
+    fake_ip_adapter_module.IPAdapterXL = object()
+    monkeypatch.setitem(sys.modules, "ip_adapter", fake_ip_adapter_module)
+    monkeypatch.setattr(worker, "build_pipeline_and_adapter", lambda device="cuda", ip_adapter_cls=None: (None, object()))
+
+    def fake_generate(**kwargs):  # noqa: ANN003
+        captured.update(kwargs)
+        return [Image.new("RGBA", (4, 4), (255, 0, 0, 255))]
+
+    def fake_write_worker_outputs(**kwargs):  # noqa: ANN003
+        captured.update(kwargs)
+        return {"output_image": str(output)}
+
+    monkeypatch.setattr(worker, "generate_stylized_images", fake_generate)
+    monkeypatch.setattr(worker, "write_worker_outputs", fake_write_worker_outputs)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "instantstyle_worker.py",
+            "--run-dir",
+            str(tmp_path / "run"),
+            "--rgb-image",
+            str(rgb),
+            "--control-image",
+            str(control),
+            "--style-image",
+            str(style),
+            "--prompt",
+            "ceramic mug",
+            "--output-image",
+            str(output),
+            "--seed",
+            "123",
+            "--strength",
+            "0.72",
+            "--style-scale",
+            "1.8",
+            "--guidance-scale",
+            "6.5",
+            "--num-inference-steps",
+            "35",
+            "--controlnet-conditioning-scale",
+            "0.45",
+        ],
+    )
+
+    worker.main()
+
+    assert captured["style_scale"] == 1.8
+    assert captured["guidance_scale"] == 6.5
+    assert captured["num_inference_steps"] == 35
+    assert captured["controlnet_conditioning_scale"] == 0.45

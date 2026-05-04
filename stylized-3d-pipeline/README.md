@@ -49,3 +49,34 @@ Useful flags:
 - `--skip-existing` skips any step whose metadata already exists
 - `--foreground-ratio`, `--texture-resolution`, and `--remesh-option` forward directly into the corresponding stages
 - `--view-resolution`, `--camera-distance`, `--camera-fovy-deg`, and `--seed` control the multiview sampling and stylization stages
+
+## Current experiment repro
+
+Use this wrapper when you want to reproduce the current strong-style multiview result with editable parameters.
+
+Fast rebake from an existing run that already has `sf3d`, `views`, and `stylize`:
+
+```bash
+python scripts/reproduce_current_experiment.py \
+  --source-run runs/real-chair-starry-strongstyle-v1 \
+  --run-name real-chair-starry-strongstyle-vflip-repro
+```
+
+Full run from an input image:
+
+```bash
+python scripts/reproduce_current_experiment.py \
+  --input /abs/path/content.png \
+  --style-image /root/autodl-tmp/src/InstantStyle/assets/4.jpg \
+  --run-name real-chair-starry-full-repro \
+  --sf3d-python /root/autodl-tmp/envs/sf3d/bin/python \
+  --instantstyle-python /root/autodl-tmp/envs/instantstyle/bin/python \
+  --prompt "a wooden chair, blue starry night, crescent moon, golden stars, decorative painted textile style, bold blue and gold folk art" \
+  --strength 0.72 \
+  --style-scale 1.8 \
+  --guidance-scale 6.5 \
+  --num-inference-steps 35 \
+  --controlnet-conditioning-scale 0.45
+```
+
+The default strong-style values in `reproduce_current_experiment.py` match the latest accepted run. Override any CLI flag to tune camera, SF3D, style strength, IP-Adapter scale, guidance, sampling steps, or ControlNet scale.

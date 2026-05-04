@@ -250,6 +250,7 @@ def test_documented_cli_entrypoints_support_help_from_project_root() -> None:
         "scripts/step3_instantstyle.py",
         "scripts/step4_retexture.py",
         "scripts/step5_build_viewer.py",
+        "scripts/reproduce_current_experiment.py",
     ]
 
     for script in scripts:

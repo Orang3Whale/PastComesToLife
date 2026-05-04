@@ -45,6 +45,10 @@ def build_worker_meta(
     seed: int,
     strength: float,
     output_image: Path,
+    style_scale: float = 1.0,
+    guidance_scale: float = 5.0,
+    num_inference_steps: int = 30,
+    controlnet_conditioning_scale: float = 0.6,
 ) -> dict[str, str | int | float]:
     return {
         "rgb_image": str(rgb_image),
@@ -53,6 +57,10 @@ def build_worker_meta(
         "prompt": prompt,
         "seed": seed,
         "strength": strength,
+        "style_scale": style_scale,
+        "guidance_scale": guidance_scale,
+        "num_inference_steps": num_inference_steps,
+        "controlnet_conditioning_scale": controlnet_conditioning_scale,
         "output_image": str(output_image),
     }
 
@@ -108,20 +116,24 @@ def generate_stylized_images(
     control_image: Image.Image,
     seed: int,
     strength: float,
+    style_scale: float = 1.0,
+    guidance_scale: float = 5.0,
+    num_inference_steps: int = 30,
+    controlnet_conditioning_scale: float = 0.6,
 ) -> object:
     return ip_model.generate(
         pil_image=style,
         prompt=prompt,
         negative_prompt="text, watermark, lowres, low quality, worst quality, deformed, blurry",
-        scale=1.0,
-        guidance_scale=5.0,
+        scale=style_scale,
+        guidance_scale=guidance_scale,
         num_samples=1,
-        num_inference_steps=30,
+        num_inference_steps=num_inference_steps,
         seed=seed,
         image=base_image,
         control_image=control_image,
         strength=strength,
-        controlnet_conditioning_scale=0.6,
+        controlnet_conditioning_scale=controlnet_conditioning_scale,
     )
 
 
@@ -134,6 +146,10 @@ def write_worker_outputs(
     prompt: str,
     seed: int,
     strength: float,
+    style_scale: float = 1.0,
+    guidance_scale: float = 5.0,
+    num_inference_steps: int = 30,
+    controlnet_conditioning_scale: float = 0.6,
 ) -> dict[str, str | int | float]:
     output_image.parent.mkdir(parents=True, exist_ok=True)
     stylized_image.save(output_image)
@@ -144,6 +160,10 @@ def write_worker_outputs(
         prompt=prompt,
         seed=seed,
         strength=strength,
+        style_scale=style_scale,
+        guidance_scale=guidance_scale,
+        num_inference_steps=num_inference_steps,
+        controlnet_conditioning_scale=controlnet_conditioning_scale,
         output_image=output_image,
     )
     (output_image.parent / "worker_meta.json").write_text(
@@ -163,6 +183,10 @@ def main() -> None:
     parser.add_argument("--output-image", required=True, type=Path)
     parser.add_argument("--seed", default=42, type=int)
     parser.add_argument("--strength", default=0.45, type=float)
+    parser.add_argument("--style-scale", default=1.0, type=float)
+    parser.add_argument("--guidance-scale", default=5.0, type=float)
+    parser.add_argument("--num-inference-steps", default=30, type=int)
+    parser.add_argument("--controlnet-conditioning-scale", default=0.6, type=float)
     args = parser.parse_args()
 
     root = find_upstream_repo_root(Path(__file__))
@@ -194,6 +218,10 @@ def main() -> None:
         control_image=control,
         seed=args.seed,
         strength=args.strength,
+        style_scale=args.style_scale,
+        guidance_scale=args.guidance_scale,
+        num_inference_steps=args.num_inference_steps,
+        controlnet_conditioning_scale=args.controlnet_conditioning_scale,
     )
 
     stylized = images[0].convert("RGBA").resize(control.size)
@@ -206,6 +234,10 @@ def main() -> None:
         prompt=args.prompt,
         seed=args.seed,
         strength=args.strength,
+        style_scale=args.style_scale,
+        guidance_scale=args.guidance_scale,
+        num_inference_steps=args.num_inference_steps,
+        controlnet_conditioning_scale=args.controlnet_conditioning_scale,
     )
 
 
