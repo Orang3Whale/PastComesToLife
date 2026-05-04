@@ -18,7 +18,7 @@ def _triangle_pixels(width: int, height: int, tri_uv: np.ndarray) -> Iterator[tu
 
     px = np.empty_like(tri)
     px[:, 0] = tri[:, 0] * max(width - 1, 0)
-    px[:, 1] = tri[:, 1] * max(height - 1, 0)
+    px[:, 1] = (1.0 - tri[:, 1]) * max(height - 1, 0)
 
     min_x = max(int(np.floor(px[:, 0].min())), 0)
     max_x = min(int(np.ceil(px[:, 0].max())), width - 1)

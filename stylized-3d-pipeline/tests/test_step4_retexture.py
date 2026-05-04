@@ -8,11 +8,13 @@ import trimesh
 from trimesh.visual.material import PBRMaterial
 from trimesh.visual.texture import TextureVisuals
 
+from lib.camera_views import look_at
 from lib.io_paths import create_run_tree, write_json
 from lib.reprojection import (
     ViewSample,
     _fill_texture_gaps,
     _intrinsic_from_size,
+    bake_texture,
     blend_samples,
     load_view_samples,
     project_point_to_view,
@@ -48,6 +50,83 @@ def test_fill_texture_gaps_expands_painted_colors_into_uv_holes_and_background()
     assert np.all(filled_array[1:4, 1:4, :3] == np.array([255, 0, 0], dtype=np.uint8))
     assert np.all(filled_array[0, 0, :3] == np.array([255, 0, 0], dtype=np.uint8))
     assert np.all(filled_array[:, :, 3] == 255)
+
+
+def _front_facing_uv_plane() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    vertices = np.array(
+        [
+            [0.0, -0.5, -0.5],
+            [0.0, 0.5, -0.5],
+            [0.0, 0.5, 0.5],
+            [0.0, -0.5, 0.5],
+        ],
+        dtype=np.float32,
+    )
+    faces = np.array([[0, 1, 2], [0, 2, 3]], dtype=np.int32)
+    uv = np.array(
+        [
+            [0.0, 0.0],
+            [1.0, 0.0],
+            [1.0, 1.0],
+            [0.0, 1.0],
+        ],
+        dtype=np.float32,
+    )
+    return vertices, faces, uv
+
+
+def test_bake_texture_maps_uv_v_zero_to_texture_bottom() -> None:
+    vertices, faces, uv = _front_facing_uv_plane()
+    mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
+    mesh.visual = TextureVisuals(
+        uv=uv,
+        material=PBRMaterial(baseColorTexture=Image.new("RGBA", (8, 8), (128, 128, 128, 255))),
+    )
+
+    stylized = Image.new("RGBA", (9, 9), (0, 0, 255, 255))
+    for y in range(4):
+        for x in range(9):
+            stylized.putpixel((x, y), (255, 0, 0, 255))
+
+    view = ViewSample(
+        name="front",
+        pose=look_at(
+            np.array([2.0, 0.0, 0.0], dtype=np.float32),
+            np.zeros(3, dtype=np.float32),
+            np.array([0.0, 0.0, 1.0], dtype=np.float32),
+        ),
+        intrinsic=_intrinsic_from_size(stylized.size, 90.0),
+        depth=np.full((9, 9), 2.0, dtype=np.float32),
+        stylized=stylized,
+    )
+
+    baked = bake_texture(mesh, Image.new("RGBA", (8, 8), (128, 128, 128, 255)), [view])
+
+    assert baked.getpixel((4, 0))[:3] == (255, 0, 0)
+    assert baked.getpixel((4, 7))[:3] == (0, 0, 255)
+
+
+def test_bake_visible_texels_maps_uv_v_zero_to_texture_bottom() -> None:
+    vertices, faces, uv = _front_facing_uv_plane()
+    stylized = Image.new("RGBA", (2, 2), (0, 0, 255, 255))
+    stylized.putpixel((0, 0), (255, 0, 0, 255))
+    stylized.putpixel((1, 0), (255, 0, 0, 255))
+
+    def projector(position: np.ndarray, normal: np.ndarray) -> tuple[bool, tuple[int, int]]:
+        source_y = 0 if float(position[2]) > 0.0 else 1
+        return float(normal[0]) > 0.0, (0, source_y)
+
+    baked = bake_visible_texels(
+        base=Image.new("RGBA", (8, 8), (128, 128, 128, 255)),
+        stylized=stylized,
+        vertices=vertices,
+        faces=faces,
+        uv=uv,
+        projector=projector,
+    )
+
+    assert baked.getpixel((4, 0))[:3] == (255, 0, 0)
+    assert baked.getpixel((4, 6))[:3] == (0, 0, 255)
 
 
 def test_project_point_to_view_returns_screen_coordinates() -> None:
