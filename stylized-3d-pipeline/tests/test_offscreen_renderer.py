@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pyrender
 import pytest
@@ -8,6 +10,10 @@ from trimesh.visual.texture import TextureVisuals
 
 from lib.camera_views import CameraView, look_at
 from lib.offscreen_renderer import build_neutral_render_mesh, render_offscreen_view, render_offscreen_views
+
+
+def test_offscreen_renderer_defaults_to_egl_backend() -> None:
+    assert os.environ.get("PYOPENGL_PLATFORM") == "egl"
 
 
 def _textured_triangle() -> trimesh.Trimesh:

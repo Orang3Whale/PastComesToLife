@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import os
 from typing import Callable
 
 import numpy as np
+
+os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
+
 import pyrender
 import trimesh
 from PIL import Image

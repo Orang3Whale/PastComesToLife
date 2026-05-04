@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Callable
@@ -27,6 +28,8 @@ except Exception:  # pragma: no cover - dependency is provided in the worker env
 
     IPAdapterXL = _MissingIPAdapter  # type: ignore[assignment]
 
+SDXL_MODELS_ENV_VARS = ("INSTANTSTYLE_SDXL_MODELS", "IP_ADAPTER_SDXL_MODELS")
+
 
 def find_upstream_repo_root(anchor: Path | None = None) -> Path:
     current = (anchor or Path(__file__)).resolve()
@@ -35,6 +38,35 @@ def find_upstream_repo_root(anchor: Path | None = None) -> Path:
         if candidate.is_dir():
             return parent
     raise FileNotFoundError(f"could not locate InstantStyle relative to {current}")
+
+
+def _is_valid_sdxl_models_root(candidate: Path) -> bool:
+    return (candidate / "image_encoder").is_dir() and (candidate / "ip-adapter_sdxl.bin").is_file()
+
+
+def resolve_sdxl_models_root(project_root: Path | None = None) -> Path:
+    candidates: list[Path] = []
+    for env_var in SDXL_MODELS_ENV_VARS:
+        env_value = os.environ.get(env_var)
+        if env_value:
+            candidates.append(Path(env_value))
+    if project_root is not None:
+        candidates.append(project_root / "sdxl_models")
+    candidates.append(Path("/root/autodl-tmp/models/IP-Adapter/sdxl_models"))
+
+    checked: list[str] = []
+    seen: set[Path] = set()
+    for candidate in candidates:
+        normalized = candidate.expanduser()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        checked.append(str(normalized))
+        if _is_valid_sdxl_models_root(normalized):
+            return normalized
+
+    joined = ", ".join(checked)
+    raise FileNotFoundError(f"could not locate InstantStyle SDXL models; checked: {joined}")
 
 
 def build_worker_meta(
@@ -83,7 +115,7 @@ def build_pipeline_and_adapter(
 ) -> tuple[object, object]:
     import torch  # noqa: WPS433
     project_root = Path(__file__).resolve().parents[2]
-    model_root = project_root / "sdxl_models"
+    model_root = resolve_sdxl_models_root(project_root)
 
     controlnet = ControlNetModel.from_pretrained(
         CONTROLNET_MODEL_ID,

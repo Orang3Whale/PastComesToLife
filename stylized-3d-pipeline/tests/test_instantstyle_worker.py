@@ -11,6 +11,7 @@ from scripts.workers.instantstyle_worker import (
     generate_stylized_images,
     prepare_base_image,
     prepare_control_image,
+    resolve_sdxl_models_root,
     write_worker_outputs,
 )
 
@@ -82,6 +83,16 @@ def test_build_pipeline_and_adapter_uses_img2img_pipeline(monkeypatch) -> None:
     assert seen["ip_ckpt"].endswith("/sdxl_models/ip-adapter_sdxl.bin")
     assert seen["vae_tiling"] is True
     assert pipe is ip_model
+
+
+def test_resolve_sdxl_models_root_prefers_env_override(tmp_path: Path, monkeypatch) -> None:
+    model_root = tmp_path / "cache" / "sdxl_models"
+    (model_root / "image_encoder").mkdir(parents=True)
+    (model_root / "ip-adapter_sdxl.bin").write_bytes(b"model")
+    monkeypatch.setenv("INSTANTSTYLE_SDXL_MODELS", str(model_root))
+    monkeypatch.delenv("IP_ADAPTER_SDXL_MODELS", raising=False)
+
+    assert resolve_sdxl_models_root(project_root=tmp_path / "project") == model_root
 
 
 def test_generate_stylized_images_passes_base_image_control_image_and_strength() -> None:
