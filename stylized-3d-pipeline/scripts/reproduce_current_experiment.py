@@ -37,8 +37,8 @@ DEFAULT_GUIDANCE_SCALE = 6.5
 DEFAULT_NUM_INFERENCE_STEPS = 35
 DEFAULT_CONTROLNET_CONDITIONING_SCALE = 0.45
 DEFAULT_STRENGTH = 0.72
-DEFAULT_SF3D_PYTHON = Path("/root/autodl-tmp/envs/sf3d/bin/python")
-DEFAULT_INSTANTSTYLE_PYTHON = Path("/root/autodl-tmp/envs/instantstyle/bin/python")
+DEFAULT_SF3D_PYTHON = Path(sys.executable)
+DEFAULT_INSTANTSTYLE_PYTHON = Path(sys.executable)
 
 
 def build_worker_command(

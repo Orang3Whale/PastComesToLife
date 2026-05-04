@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -9,6 +10,13 @@ from PIL import Image
 
 from lib.io_paths import create_run_tree, write_json
 from scripts import reproduce_current_experiment as repro
+
+
+def test_parser_defaults_worker_python_to_current_interpreter() -> None:
+    args = repro.build_parser().parse_args([])
+
+    assert args.sf3d_python == Path(sys.executable)
+    assert args.instantstyle_python == Path(sys.executable)
 
 
 def test_build_worker_command_includes_custom_stylize_params(tmp_path: Path) -> None:

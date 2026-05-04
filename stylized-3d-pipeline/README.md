@@ -69,8 +69,6 @@ python scripts/reproduce_current_experiment.py \
   --input /abs/path/content.png \
   --style-image /root/autodl-tmp/src/InstantStyle/assets/4.jpg \
   --run-name real-chair-starry-full-repro \
-  --sf3d-python /root/autodl-tmp/envs/sf3d/bin/python \
-  --instantstyle-python /root/autodl-tmp/envs/instantstyle/bin/python \
   --prompt "a wooden chair, blue starry night, crescent moon, golden stars, decorative painted textile style, bold blue and gold folk art" \
   --strength 0.72 \
   --style-scale 1.8 \
@@ -78,5 +76,7 @@ python scripts/reproduce_current_experiment.py \
   --num-inference-steps 35 \
   --controlnet-conditioning-scale 0.45
 ```
+
+The wrapper defaults `--sf3d-python` and `--instantstyle-python` to the current Python interpreter. Override either flag only when you intentionally run SF3D or InstantStyle from a separate environment.
 
 The default strong-style values in `reproduce_current_experiment.py` match the latest accepted run. Override any CLI flag to tune camera, SF3D, style strength, IP-Adapter scale, guidance, sampling steps, or ControlNet scale.
