@@ -17,6 +17,7 @@ from lib.io_paths import create_run_tree, resolve_run_dir, write_json
 from lib.subprocess_utils import huggingface_cache_env, run_checked
 from scripts.step1_preprocess import run_step as run_preprocess_step
 from scripts.step2_sf3d import run_step as run_sf3d_step
+from scripts.step3_instantstyle import run_step as run_instantstyle_step
 from scripts.step3_sample_views import run_step as run_sample_views_step
 from scripts.step4_retexture import run_step as run_retexture_step
 from scripts.step5_build_viewer import run_step as run_viewer_step
@@ -128,72 +129,19 @@ def run_stylize_step(
     controlnet_conditioning_scale: float = DEFAULT_CONTROLNET_CONDITIONING_SCALE,
     runner: Callable[..., None] = run_checked,
 ) -> dict:
-    paths = create_run_tree(run_dir)
-    style_copy = paths.inputs / "style.png"
-    prompt_file = paths.inputs / "prompt.txt"
-    style_copy.write_bytes(style_image.read_bytes())
-    prompt_file.write_text(prompt, encoding="utf-8")
-
-    views = _validate_view_manifest(paths.views / "manifest.json")
-    worker_script = Path(__file__).resolve().parent / "workers" / "instantstyle_worker.py"
-    result: dict[str, dict[str, dict[str, str]] | float | str] = {
-        "style_image": str(style_copy),
-        "prompt": prompt,
-        "strength": strength,
-        "style_scale": style_scale,
-        "guidance_scale": guidance_scale,
-        "num_inference_steps": num_inference_steps,
-        "controlnet_conditioning_scale": controlnet_conditioning_scale,
-        "views": {},
-    }
-
-    for view in views:
-        view_name = view["name"]
-        rgb_image = Path(view["rgb_path"])
-        control_image = Path(view["control_path"])
-        mask_image = Path(view["mask_path"])
-        output_image = paths.stylize / view_name / "stylized.png"
-        output_image.parent.mkdir(parents=True, exist_ok=True)
-        cmd = build_worker_command(
-            instantstyle_python=instantstyle_python,
-            worker_script=worker_script,
-            run_dir=paths.root,
-            rgb_image=rgb_image,
-            control_image=control_image,
-            style_image=style_copy,
-            prompt=prompt,
-            output_image=output_image,
-            seed=seed,
-            strength=strength,
-            style_scale=style_scale,
-            guidance_scale=guidance_scale,
-            num_inference_steps=num_inference_steps,
-            controlnet_conditioning_scale=controlnet_conditioning_scale,
-        )
-        worker_env = huggingface_cache_env()
-        worker_env.update({"HF_ENDPOINT": "https://hf-mirror.com", "OMP_NUM_THREADS": "1"})
-        runner(cmd, env=worker_env)
-        if not output_image.is_file():
-            raise FileNotFoundError(f"missing stylized output: {output_image}")
-        with Image.open(output_image) as stylized_image, Image.open(mask_image) as mask_source:
-            stylized = stylized_image.convert("RGBA")
-            mask = mask_source.convert("L").resize(stylized.size, Image.Resampling.NEAREST)
-            stylized.putalpha(mask)
-            stylized.save(output_image)
-        result["views"][view_name] = {
-            "rgb_path": str(rgb_image),
-            "control_path": str(control_image),
-            "stylized_path": str(output_image),
-        }
-
-    front_output = paths.stylize / "front" / "stylized.png"
-    legacy_output = paths.stylize / "stylized.png"
-    if front_output.is_file():
-        shutil.copyfile(front_output, legacy_output)
-
-    write_json(paths.stylize / "manifest.json", result)
-    write_json(paths.stylize / "stylize_meta.json", result)
-    return result
+    return run_instantstyle_step(
+        run_dir=run_dir,
+        instantstyle_python=instantstyle_python,
+        style_image=style_image,
+        prompt=prompt,
+        seed=seed,
+        strength=strength,
+        style_scale=style_scale,
+        guidance_scale=guidance_scale,
+        num_inference_steps=num_inference_steps,
+        controlnet_conditioning_scale=controlnet_conditioning_scale,
+        runner=runner,
+    )
 
 
 def _copy_stage_trees(source_run: Path, target_run: Path) -> None:

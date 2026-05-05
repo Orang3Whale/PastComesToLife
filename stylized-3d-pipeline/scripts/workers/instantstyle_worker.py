@@ -205,14 +205,127 @@ def write_worker_outputs(
     return metadata
 
 
+def _read_jobs_manifest(jobs_manifest: Path) -> list[dict[str, object]]:
+    payload = json.loads(jobs_manifest.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"invalid jobs manifest: {jobs_manifest}")
+    jobs = payload.get("jobs")
+    if not isinstance(jobs, list) or not jobs:
+        raise ValueError(f"jobs manifest must contain jobs: {jobs_manifest}")
+    for job in jobs:
+        if not isinstance(job, dict):
+            raise ValueError(f"invalid job entry in {jobs_manifest}")
+        for key in ("rgb_image", "control_image", "style_image", "prompt", "output_image"):
+            if key not in job:
+                raise ValueError(f"missing job field {key}: {jobs_manifest}")
+        for key in ("rgb_image", "control_image", "style_image"):
+            path = Path(str(job[key]))
+            if not path.is_file():
+                raise FileNotFoundError(f"missing job asset: {path}")
+    return jobs
+
+
+def _job_from_args(args: argparse.Namespace) -> dict[str, object]:
+    required = {
+        "rgb_image": args.rgb_image,
+        "control_image": args.control_image,
+        "style_image": args.style_image,
+        "prompt": args.prompt,
+        "output_image": args.output_image,
+    }
+    missing = [name for name, value in required.items() if value is None]
+    if missing:
+        joined = ", ".join(f"--{name.replace('_', '-')}" for name in missing)
+        raise ValueError(f"missing required single-view arguments: {joined}")
+    return {
+        "rgb_image": str(args.rgb_image),
+        "control_image": str(args.control_image),
+        "style_image": str(args.style_image),
+        "prompt": args.prompt,
+        "output_image": str(args.output_image),
+        "seed": args.seed,
+        "strength": args.strength,
+        "style_scale": args.style_scale,
+        "guidance_scale": args.guidance_scale,
+        "num_inference_steps": args.num_inference_steps,
+        "controlnet_conditioning_scale": args.controlnet_conditioning_scale,
+    }
+
+
+def run_stylization_job(
+    job: dict[str, object],
+    ip_model: object,
+    style_cache: dict[Path, Image.Image] | None = None,
+) -> dict[str, str | int | float]:
+    rgb_image = Path(str(job["rgb_image"]))
+    control_image = Path(str(job["control_image"]))
+    style_image = Path(str(job["style_image"]))
+    output_image = Path(str(job["output_image"]))
+    prompt = str(job["prompt"])
+    seed = int(job.get("seed", 42))
+    strength = float(job.get("strength", 0.45))
+    style_scale = float(job.get("style_scale", 1.0))
+    guidance_scale = float(job.get("guidance_scale", 5.0))
+    num_inference_steps = int(job.get("num_inference_steps", 30))
+    controlnet_conditioning_scale = float(job.get("controlnet_conditioning_scale", 0.6))
+
+    with Image.open(rgb_image) as rgb_source:
+        base = prepare_base_image(rgb_source)
+    with Image.open(control_image) as control_source:
+        control = prepare_control_image(control_source)
+
+    cache = style_cache if style_cache is not None else {}
+    style = cache.get(style_image)
+    if style is None:
+        with Image.open(style_image) as style_source:
+            style = style_source.convert("RGB")
+        cache[style_image] = style
+
+    images = generate_stylized_images(
+        ip_model=ip_model,
+        style=style,
+        prompt=prompt,
+        base_image=base,
+        control_image=control,
+        seed=seed,
+        strength=strength,
+        style_scale=style_scale,
+        guidance_scale=guidance_scale,
+        num_inference_steps=num_inference_steps,
+        controlnet_conditioning_scale=controlnet_conditioning_scale,
+    )
+
+    stylized = images[0].convert("RGBA").resize(control.size)
+    return write_worker_outputs(
+        output_image=output_image,
+        stylized_image=stylized,
+        rgb_image=rgb_image,
+        control_image=control_image,
+        style_image=style_image,
+        prompt=prompt,
+        seed=seed,
+        strength=strength,
+        style_scale=style_scale,
+        guidance_scale=guidance_scale,
+        num_inference_steps=num_inference_steps,
+        controlnet_conditioning_scale=controlnet_conditioning_scale,
+    )
+
+
+def run_stylization_jobs(jobs: list[dict[str, object]], ip_model: object) -> list[dict[str, str | int | float]]:
+    style_cache: dict[Path, Image.Image] = {}
+    return [run_stylization_job(job, ip_model=ip_model, style_cache=style_cache) for job in jobs]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-dir", required=True, type=Path)
-    parser.add_argument("--rgb-image", required=True, type=Path)
-    parser.add_argument("--control-image", required=True, type=Path)
-    parser.add_argument("--style-image", required=True, type=Path)
-    parser.add_argument("--prompt", required=True)
-    parser.add_argument("--output-image", required=True, type=Path)
+    parser.add_argument("--jobs-manifest", type=Path)
+    parser.add_argument("--rgb-image", type=Path)
+    parser.add_argument("--control-image", type=Path)
+    parser.add_argument("--style-image", type=Path)
+    parser.add_argument("--prompt")
+    parser.add_argument("--output-image", type=Path)
     parser.add_argument("--seed", default=42, type=int)
     parser.add_argument("--strength", default=0.45, type=float)
     parser.add_argument("--style-scale", default=1.0, type=float)
@@ -235,42 +348,8 @@ def main() -> None:
 
     _, ip_model = build_pipeline_and_adapter(device="cuda", ip_adapter_cls=runtime_ip_adapter)
 
-    with Image.open(args.rgb_image) as rgb_image:
-        base = prepare_base_image(rgb_image)
-    with Image.open(args.control_image) as control_image:
-        control = prepare_control_image(control_image)
-    with Image.open(args.style_image) as style_image:
-        style = style_image.convert("RGB")
-
-    images = generate_stylized_images(
-        ip_model=ip_model,
-        style=style,
-        prompt=args.prompt,
-        base_image=base,
-        control_image=control,
-        seed=args.seed,
-        strength=args.strength,
-        style_scale=args.style_scale,
-        guidance_scale=args.guidance_scale,
-        num_inference_steps=args.num_inference_steps,
-        controlnet_conditioning_scale=args.controlnet_conditioning_scale,
-    )
-
-    stylized = images[0].convert("RGBA").resize(control.size)
-    write_worker_outputs(
-        output_image=args.output_image,
-        stylized_image=stylized,
-        rgb_image=args.rgb_image,
-        control_image=args.control_image,
-        style_image=args.style_image,
-        prompt=args.prompt,
-        seed=args.seed,
-        strength=args.strength,
-        style_scale=args.style_scale,
-        guidance_scale=args.guidance_scale,
-        num_inference_steps=args.num_inference_steps,
-        controlnet_conditioning_scale=args.controlnet_conditioning_scale,
-    )
+    jobs = _read_jobs_manifest(args.jobs_manifest) if args.jobs_manifest else [_job_from_args(args)]
+    run_stylization_jobs(jobs, ip_model=ip_model)
 
 
 if __name__ == "__main__":

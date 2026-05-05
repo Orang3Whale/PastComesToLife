@@ -94,12 +94,17 @@ def test_run_step_writes_rgb_control_and_strength_into_manifest(tmp_path: Path) 
     Image.new("RGB", (8, 8), "blue").save(style_image)
 
     seen: dict[str, object] = {}
+    call_count = 0
 
     def fake_runner(cmd, env=None):  # noqa: ANN001
+        nonlocal call_count
+        call_count += 1
         seen["cmd"] = cmd
         seen["env"] = dict(env or {})
-        out_index = cmd.index("--output-image") + 1
-        Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(Path(cmd[out_index]))
+        jobs_manifest = Path(cmd[cmd.index("--jobs-manifest") + 1])
+        payload = json.loads(jobs_manifest.read_text(encoding="utf-8"))
+        for job in payload["jobs"]:
+            Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(Path(job["output_image"]))
 
     result = run_step(
         run_dir=paths.root,
@@ -123,12 +128,10 @@ def test_run_step_writes_rgb_control_and_strength_into_manifest(tmp_path: Path) 
         "HF_ENDPOINT": "https://hf-mirror.com",
         "OMP_NUM_THREADS": "1",
     }
-    assert "--rgb-image" in seen["cmd"]
-    assert "--control-image" in seen["cmd"]
-    assert "--strength" in seen["cmd"]
-    assert "0.45" in seen["cmd"]
-    assert "--seed" in seen["cmd"]
-    assert "123" in seen["cmd"]
+    assert call_count == 1
+    assert "--jobs-manifest" in seen["cmd"]
+    jobs_manifest = json.loads((paths.stylize / "worker_jobs.json").read_text(encoding="utf-8"))
+    assert len(jobs_manifest["jobs"]) == 6
     assert (paths.stylize / "front" / "stylized.png").is_file()
     assert (paths.stylize / "left" / "stylized.png").is_file()
     assert (paths.stylize / "stylized.png").is_file()

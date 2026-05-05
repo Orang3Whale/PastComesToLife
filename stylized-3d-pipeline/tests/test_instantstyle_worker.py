@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from types import ModuleType
 import sys
@@ -253,3 +254,78 @@ def test_main_parses_custom_style_parameters(tmp_path: Path, monkeypatch) -> Non
     assert captured["guidance_scale"] == 6.5
     assert captured["num_inference_steps"] == 35
     assert captured["controlnet_conditioning_scale"] == 0.45
+
+
+def test_main_processes_jobs_manifest_with_single_model_load(tmp_path: Path, monkeypatch) -> None:
+    rgb = tmp_path / "rgb.png"
+    control = tmp_path / "control.png"
+    style = tmp_path / "style.png"
+    Image.new("RGBA", (4, 4), (10, 20, 30, 255)).save(rgb)
+    Image.new("RGBA", (4, 4), (0, 0, 0, 255)).save(control)
+    Image.new("RGB", (4, 4), "blue").save(style)
+    jobs_manifest = tmp_path / "jobs.json"
+    outputs = [tmp_path / f"out-{index}.png" for index in range(2)]
+    jobs_manifest.write_text(
+        json.dumps(
+            {
+                "jobs": [
+                    {
+                        "name": f"view-{index}",
+                        "rgb_image": str(rgb),
+                        "control_image": str(control),
+                        "style_image": str(style),
+                        "prompt": "ceramic mug",
+                        "output_image": str(output),
+                        "seed": 123,
+                        "strength": 0.72,
+                        "style_scale": 1.8,
+                        "guidance_scale": 6.5,
+                        "num_inference_steps": 35,
+                        "controlnet_conditioning_scale": 0.45,
+                    }
+                    for index, output in enumerate(outputs)
+                ]
+            },
+            indent=2,
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+
+    build_calls = []
+    generate_calls = []
+    output_calls = []
+
+    fake_ip_adapter_module = ModuleType("ip_adapter")
+    fake_ip_adapter_module.IPAdapterXL = object()
+    monkeypatch.setitem(sys.modules, "ip_adapter", fake_ip_adapter_module)
+    monkeypatch.setattr(worker, "build_pipeline_and_adapter", lambda device="cuda", ip_adapter_cls=None: build_calls.append((device, ip_adapter_cls)) or (None, object()))
+
+    def fake_generate_stylized_images(**kwargs):  # noqa: ANN003
+        generate_calls.append(kwargs)
+        return [Image.new("RGBA", (4, 4), (255, 0, 0, 255))]
+
+    def fake_write_worker_outputs(**kwargs):  # noqa: ANN003
+        output_calls.append(kwargs)
+        return {"output_image": str(kwargs["output_image"])}
+
+    monkeypatch.setattr(worker, "generate_stylized_images", fake_generate_stylized_images)
+    monkeypatch.setattr(worker, "write_worker_outputs", fake_write_worker_outputs)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "instantstyle_worker.py",
+            "--run-dir",
+            str(tmp_path / "run"),
+            "--jobs-manifest",
+            str(jobs_manifest),
+        ],
+    )
+
+    worker.main()
+
+    assert len(build_calls) == 1
+    assert len(generate_calls) == 2
+    assert len(output_calls) == 2
+    assert {Path(call["output_image"]) for call in output_calls} == set(outputs)
