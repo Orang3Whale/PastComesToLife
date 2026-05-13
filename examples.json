@@ -1,0 +1,14 @@
+{
+  "project": {
+    "title": "旧物·新生 PastComesToLife",
+    "subtitle": "老物件三维化与风格重构",
+    "description": "从单张图像出发，通过SF3D生成三维模型，获取六视角渲染图，结合风格参考图与提示词，借助InstantStyle生成六视角风格化贴图，最终回贴得到风格化三维模型。"
+  },
+  "examples": [
+    {
+      "id": "starry_chair",
+      "title": "星空椅子",
+      "description": "一把普通的椅子，经过风格化重构，融入梵高《星空》的流动笔触与色彩"
+    }
+  ]
+}

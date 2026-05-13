@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>旧物·新生 PastComesToLife</title>
+<style>
+  :root {
+    --bg: #f5f0e8;
+    --card-bg: #faf7f2;
+    --text: #3d2b1f;
+    --text-secondary: #6b5d4f;
+    --accent: #8b6914;
+    --accent-light: #c9a84c;
+    --border: #d4c5b2;
+    --hero-from: #2d1b0f;
+    --hero-to: #4a3020;
+    --shadow: 0 2px 12px rgba(61,43,31,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", Georgia, serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    min-height: 100vh;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    background: linear-gradient(135deg, var(--hero-from) 0%, #3d2b1f 40%, var(--hero-to) 100%);
+    color: #f5f0e8;
+    text-align: center;
+    padding: 80px 20px 70px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M20 80 Q40 60 50 70 T80 80" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="0.5"/></svg>') repeat;
+    pointer-events: none;
+  }
+  .hero h1 {
+    font-size: clamp(2rem, 5vw, 3.4rem);
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    position: relative;
+    margin-bottom: 12px;
+  }
+  .hero .subtitle {
+    font-size: clamp(1rem, 2.5vw, 1.35rem);
+    color: #c9a84c;
+    letter-spacing: 0.1em;
+    position: relative;
+    margin-bottom: 24px;
+  }
+  .hero .desc {
+    font-size: 0.95rem;
+    color: #baa89a;
+    max-width: 640px;
+    margin: 0 auto;
+    position: relative;
+  }
+  .hero .scroll-hint {
+    margin-top: 40px;
+    position: relative;
+    animation: bounce 2s infinite;
+    opacity: 0.5;
+  }
+  .hero .scroll-hint svg { width: 28px; height: 28px; }
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(10px); }
+  }
+
+  /* ── Pipeline Bar ── */
+  .pipeline {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    padding: 24px 20px;
+    background: #e8ddd0;
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.04em;
+  }
+  .pipeline span { white-space: nowrap; }
+  .pipeline .arrow { color: var(--accent); }
+
+  /* ── Section ── */
+  .container {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  .example-section {
+    margin: 48px 0 64px;
+  }
+  .example-header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .example-header h2 {
+    font-size: 1.8rem;
+    color: var(--text);
+    letter-spacing: 0.05em;
+  }
+  .example-header p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    margin-top: 4px;
+  }
+
+  /* ── Example Card ── */
+  .example-card {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    box-shadow: var(--shadow);
+  }
+  @media (max-width: 860px) {
+    .example-card { grid-template-columns: 1fr; }
+  }
+
+  .card-left {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .image-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .image-pair .img-box {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #ede6db;
+  }
+  .image-pair .img-box img {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: cover;
+    aspect-ratio: 1 / 1;
+  }
+  .img-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 6px 0;
+    letter-spacing: 0.04em;
+    background: #ede6db;
+  }
+  .prompt-card {
+    background: #f5f0e8;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+  }
+  .prompt-card .prompt-label {
+    font-size: 0.78rem;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .prompt-card .prompt-text {
+    font-size: 1.1rem;
+    font-style: italic;
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  /* ── 3D Viewer ── */
+  .model-viewer-wrap {
+    position: relative;
+    background: linear-gradient(180deg, #eae3d8 0%, #dcd3c6 100%);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    min-height: 420px;
+    cursor: grab;
+  }
+  .model-viewer-wrap:active { cursor: grabbing; }
+  .model-viewer-wrap canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .model-viewer-wrap .loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+  .model-viewer-wrap .spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .viewer-controls {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    display: flex;
+    gap: 6px;
+    z-index: 2;
+  }
+  .viewer-controls button {
+    background: rgba(250,247,242,0.9);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.03em;
+    transition: background 0.2s;
+  }
+  .viewer-controls button:hover { background: #fff; }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border);
+    margin-top: 32px;
+  }
+  .footer a { color: var(--accent); text-decoration: none; }
+  .footer a:hover { text-decoration: underline; }
+
+  /* ── No examples state ── */
+  .empty-state {
+    text-align: center;
+    padding: 80px 20px;
+    color: var(--text-secondary);
+  }
+  .empty-state h3 { font-size: 1.3rem; margin-bottom: 8px; color: var(--text); }
+
+  /* ── Add example guide ── */
+  .add-guide {
+    background: var(--card-bg);
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    margin: 32px 0;
+    text-align: center;
+  }
+  .add-guide h3 {
+    font-size: 1.1rem;
+    color: var(--text);
+    margin-bottom: 12px;
+  }
+  .add-guide code {
+    display: block;
+    background: #ede6db;
+    padding: 12px 20px;
+    border-radius: 6px;
+    margin: 8px 0;
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 0.85rem;
+    text-align: left;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+</style>
+</head>
+<body>
+
+<!-- Hero -->
+<header class="hero">
+  <h1 id="projectTitle">旧物·新生</h1>
+  <div class="subtitle" id="projectSubtitle">PastComesToLife</div>
+  <p class="desc" id="projectDesc"></p>
+  <div class="scroll-hint">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M12 5v14M5 12l7 7 7-7"/>
+    </svg>
+  </div>
+</header>
+
+<!-- Pipeline bar -->
+<div class="pipeline">
+  <span>单张图像</span><span class="arrow">→</span>
+  <span>SF3D 三维重建</span><span class="arrow">→</span>
+  <span>六视角渲染</span><span class="arrow">→</span>
+  <span>InstantStyle 风格化</span><span class="arrow">→</span>
+  <span>贴图回贴</span><span class="arrow">→</span>
+  <span>风格化三维模型</span>
+</div>
+
+<!-- Examples container -->
+<main class="container" id="examplesContainer"></main>
+
+<!-- Add example guide -->
+<section class="container">
+  <div class="add-guide">
+    <h3>添加新样例</h3>
+    <p>在 <code>examples/</code> 目录下创建新文件夹，放入以下文件：</p>
+    <code>examples/&lt;name&gt;/
+  ├── original.png   (原始物体图片)
+  ├── style.png      (风格参考图)
+  ├── prompt.md      (提示词文本)
+  └── model.glb      (风格化后的三维模型)</code>
+    <p>然后在 <code>examples.json</code> 中添加对应条目即可。</p>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  <p>旧物·新生 PastComesToLife &mdash; 老物件三维化与风格重构</p>
+  <p style="margin-top:4px">
+    <a href="https://github.com/Orang3Whale/PastComesToLife" target="_blank" rel="noopener">GitHub</a>
+  </p>
+</footer>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+// ── Fetch project config & render page ──
+async function init() {
+  let config;
+  try {
+    const resp = await fetch("examples.json");
+    config = await resp.json();
+  } catch (e) {
+    config = { project: {}, examples: [] };
+  }
+
+  document.getElementById("projectTitle").textContent = config.project.title || "旧物·新生";
+  document.getElementById("projectSubtitle").textContent = config.project.subtitle || "PastComesToLife";
+  document.getElementById("projectDesc").textContent = config.project.description || "";
+  document.title = config.project.title || "旧物·新生 PastComesToLife";
+
+  const container = document.getElementById("examplesContainer");
+  if (!config.examples || config.examples.length === 0) {
+    container.innerHTML = `<div class="empty-state">
+      <h3>暂无样例</h3>
+      <p>请按照下方指引添加样例文件</p>
+    </div>`;
+    return;
+  }
+
+  for (const ex of config.examples) {
+    await renderExample(container, ex);
+  }
+}
+
+// ── Render one example ──
+async function renderExample(container, ex) {
+  const base = `examples/${ex.id}`;
+
+  // Fetch prompt text
+  let promptText = "";
+  try {
+    const resp = await fetch(`${base}/prompt.md`);
+    if (resp.ok) promptText = await resp.text();
+  } catch (e) {}
+
+  // Build section
+  const section = document.createElement("div");
+  section.className = "example-section";
+  section.innerHTML = `
+    <div class="example-header">
+      <h2>${escapeHtml(ex.title || ex.id)}</h2>
+      ${ex.description ? `<p>${escapeHtml(ex.description)}</p>` : ""}
+    </div>
+    <div class="example-card">
+      <div class="card-left">
+        <div class="image-pair">
+          <div>
+            <div class="img-box">
+              <img src="${base}/original.png" alt="原始图片" loading="lazy"
+                   onerror="this.parentElement.parentElement.style.display='none'">
+            </div>
+            <div class="img-label">原始图片</div>
+          </div>
+          <div>
+            <div class="img-box">
+              <img src="${base}/style.png" alt="风格参考图" loading="lazy"
+                   onerror="this.parentElement.parentElement.style.display='none'">
+            </div>
+            <div class="img-label">风格参考图</div>
+          </div>
+        </div>
+        ${promptText ? `
+        <div class="prompt-card">
+          <div class="prompt-label">提示词 Prompt</div>
+          <div class="prompt-text">${escapeHtml(promptText.trim())}</div>
+        </div>` : ""}
+      </div>
+      <div class="model-viewer-wrap" id="viewer-${ex.id}">
+        <div class="loading">
+          <div class="spinner"></div>
+          <span>加载三维模型中...</span>
+        </div>
+        <div class="viewer-controls">
+          <button title="重置视角" id="reset-${ex.id}">重置</button>
+          <button title="自动旋转" id="auto-${ex.id}">旋转</button>
+        </div>
+      </div>
+    </div>
+  `;
+  container.appendChild(section);
+
+  // Set up 3D viewer
+  setupViewer(ex.id, `${base}/model.glb`);
+}
+
+// ── 3D Viewer ──
+const viewers = {};
+function setupViewer(id, modelUrl) {
+  const wrap = document.getElementById(`viewer-${id}`);
+  if (!wrap) return;
+
+  const width = wrap.clientWidth;
+  const height = Math.max(420, wrap.clientHeight || 420);
+
+  // Scene
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xeae3d8);
+  scene.fog = new THREE.Fog(0xeae3d8, 4, 18);
+
+  // Camera
+  const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 50);
+  camera.position.set(3, 2.2, 4.5);
+
+  // Renderer
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(width, height, false);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.1;
+  wrap.appendChild(renderer.domElement);
+
+  // Lighting
+  const ambient = new THREE.AmbientLight(0xfff5e8, 1.6);
+  scene.add(ambient);
+
+  const key = new THREE.DirectionalLight(0xffffff, 2.8);
+  key.position.set(5, 8, 5);
+  key.castShadow = true;
+  key.shadow.mapSize.set(1024, 1024);
+  key.shadow.camera.near = 0.5;
+  key.shadow.camera.far = 30;
+  key.shadow.camera.left = -8;
+  key.shadow.camera.right = 8;
+  key.shadow.camera.top = 8;
+  key.shadow.camera.bottom = -8;
+  key.shadow.bias = -0.0001;
+  scene.add(key);
+
+  const fill = new THREE.DirectionalLight(0xc8b896, 1.2);
+  fill.position.set(-3, 1, -2);
+  scene.add(fill);
+
+  const rim = new THREE.DirectionalLight(0xffffff, 0.9);
+  rim.position.set(0, 2, -4);
+  scene.add(rim);
+
+  // Ground shadow plane
+  const groundGeo = new THREE.PlaneGeometry(12, 12);
+  const groundMat = new THREE.ShadowMaterial({ opacity: 0.22 });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // Controls
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 0.6, 0);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 1.2;
+  controls.maxDistance = 10;
+  controls.maxPolarAngle = Math.PI * 0.75;
+  controls.autoRotate = false;
+  controls.autoRotateSpeed = 1.2;
+  controls.update();
+
+  // Store viewer state
+  viewers[id] = { scene, camera, renderer, controls, wrap, autoRotate: false };
+
+  // Load model
+  const loader = new GLTFLoader();
+  loader.load(
+    modelUrl,
+    (gltf) => {
+      // Remove loading
+      const loadingEl = wrap.querySelector(".loading");
+      if (loadingEl) loadingEl.remove();
+
+      const model = gltf.scene;
+
+      // Center and scale
+      const box = new THREE.Box3().setFromObject(model);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const scale = 3.5 / maxDim;
+      model.scale.setScalar(scale);
+      model.position.set(-center.x * scale, -box.min.y * scale + 0.15, -center.z * scale);
+
+      // Enable shadows on all meshes
+      model.traverse((node) => {
+        if (node.isMesh) {
+          node.castShadow = true;
+          node.receiveShadow = true;
+        }
+      });
+
+      scene.add(model);
+      viewers[id].model = model;
+    },
+    undefined,
+    (err) => {
+      const loadingEl = wrap.querySelector(".loading");
+      if (loadingEl) {
+        loadingEl.innerHTML = `<span>模型加载失败</span>`;
+      }
+    }
+  );
+
+  // Event handlers for viewer buttons
+  document.getElementById(`reset-${id}`).addEventListener("click", () => {
+    const v = viewers[id];
+    if (!v) return;
+    camera.position.set(3, 2.2, 4.5);
+    controls.target.set(0, 0.6, 0);
+    controls.update();
+  });
+  document.getElementById(`auto-${id}`).addEventListener("click", () => {
+    const v = viewers[id];
+    if (!v) return;
+    v.autoRotate = !v.autoRotate;
+    controls.autoRotate = v.autoRotate;
+    document.getElementById(`auto-${id}`).textContent = v.autoRotate ? "停止" : "旋转";
+  });
+
+  // Resize observer
+  const resizeObserver = new ResizeObserver(() => {
+    const w = wrap.clientWidth;
+    const h = Math.max(420, wrap.clientHeight);
+    if (w !== viewers[id].renderer.domElement.width || h !== viewers[id].renderer.domElement.height) {
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+  });
+  resizeObserver.observe(wrap);
+  viewers[id].resizeObserver = resizeObserver;
+
+  // Animation loop
+  function animate() {
+    if (!viewers[id]) return;
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  animate();
+}
+
+// ── Utility ──
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ── Kick off ──
+init();
+</script>
+
+<!-- Google Fonts for Noto Serif SC -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+</body>
+</html>
