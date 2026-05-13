@@ -320,11 +320,11 @@
     <h3>添加新样例</h3>
     <p>在 <code>examples/</code> 目录下创建新文件夹，放入以下文件：</p>
     <code>examples/&lt;name&gt;/
-  ├── original.png   (原始物体图片)
-  ├── style.png      (风格参考图)
+  ├── original.png   (原始物体图片，支持 .png .jpg .webp 等)
+  ├── style.png      (风格参考图，支持 .png .jpg .webp 等)
   ├── prompt.md      (提示词文本)
   └── model.glb      (风格化后的三维模型)</code>
-    <p>然后在 <code>examples.json</code> 中添加对应条目即可。</p>
+    <p>在 <code>examples.json</code> 中添加对应条目，若文件名非默认需指定 <code>"original"</code>、<code>"style"</code>、<code>"model"</code> 字段。</p>
   </div>
 </section>
 
@@ -375,6 +375,9 @@ async function init() {
   }
 
   for (const ex of config.examples) {
+    ex.original = ex.original || "original.png";
+    ex.style = ex.style || "style.png";
+    ex.model = ex.model || "model.glb";
     await renderExample(container, ex);
   }
 }
@@ -403,14 +406,14 @@ async function renderExample(container, ex) {
         <div class="image-pair">
           <div>
             <div class="img-box">
-              <img src="${base}/original.png" alt="原始图片" loading="lazy"
+              <img src="${base}/${ex.original}" alt="原始图片" loading="lazy"
                    onerror="this.parentElement.parentElement.style.display='none'">
             </div>
             <div class="img-label">原始图片</div>
           </div>
           <div>
             <div class="img-box">
-              <img src="${base}/style.png" alt="风格参考图" loading="lazy"
+              <img src="${base}/${ex.style}" alt="风格参考图" loading="lazy"
                    onerror="this.parentElement.parentElement.style.display='none'">
             </div>
             <div class="img-label">风格参考图</div>
@@ -437,7 +440,7 @@ async function renderExample(container, ex) {
   container.appendChild(section);
 
   // Set up 3D viewer
-  setupViewer(ex.id, `${base}/model.glb`);
+  setupViewer(ex.id, `${base}/${ex.model}`);
 }
 
 // ── 3D Viewer ──
@@ -535,7 +538,7 @@ function setupViewer(id, modelUrl) {
       const maxDim = Math.max(size.x, size.y, size.z);
       const scale = 3.5 / maxDim;
       model.scale.setScalar(scale);
-      model.position.set(-center.x * scale, -box.min.y * scale + 0.15, -center.z * scale);
+      model.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
 
       // Enable shadows on all meshes
       model.traverse((node) => {
@@ -546,7 +549,31 @@ function setupViewer(id, modelUrl) {
       });
 
       scene.add(model);
+
+      // Compute world-space bounding box after scaling & positioning
+      const worldBox = new THREE.Box3().setFromObject(model);
+      const worldCenter = worldBox.getCenter(new THREE.Vector3());
+      const worldBottom = worldBox.min.y;
+
+      // Ground shadow plane at model's actual bottom
+      ground.position.y = worldBottom;
+
+      // Point controls & camera at model's geometric center
+      controls.target.copy(worldCenter);
+      const worldSize = worldBox.getSize(new THREE.Vector3());
+      const viewDist = Math.max(worldSize.x, worldSize.y, worldSize.z) * 1.5;
+      camera.position.set(
+        worldCenter.x + viewDist * 0.8,
+        worldCenter.y + viewDist * 0.55,
+        worldCenter.z + viewDist
+      );
+      camera.lookAt(worldCenter);
+      controls.update();
+
+      // Store for reset
       viewers[id].model = model;
+      viewers[id].worldCenter = worldCenter;
+      viewers[id].initCameraPos = camera.position.clone();
     },
     undefined,
     (err) => {
@@ -560,9 +587,9 @@ function setupViewer(id, modelUrl) {
   // Event handlers for viewer buttons
   document.getElementById(`reset-${id}`).addEventListener("click", () => {
     const v = viewers[id];
-    if (!v) return;
-    camera.position.set(3, 2.2, 4.5);
-    controls.target.set(0, 0.6, 0);
+    if (!v || !v.worldCenter) return;
+    camera.position.copy(v.initCameraPos);
+    controls.target.copy(v.worldCenter);
     controls.update();
   });
   document.getElementById(`auto-${id}`).addEventListener("click", () => {

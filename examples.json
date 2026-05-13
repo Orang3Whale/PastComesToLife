@@ -8,7 +8,10 @@
     {
       "id": "starry_chair",
       "title": "星空椅子",
-      "description": "一把普通的椅子，经过风格化重构，融入梵高《星空》的流动笔触与色彩"
+      "description": "一把普通的椅子，经过风格化重构，融入梵高《星空》的流动笔触与色彩",
+      "original": "original.png",
+      "style": "style.png",
+      "model": "model.glb"
     }
   ]
 }
