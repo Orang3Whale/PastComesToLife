@@ -1,0 +1,1 @@
+Close-up surface texture of a high-tech cyberpunk device, dark brushed gunmetal casing, matte black polymer, glowing neon cyan and magenta LED accents, intricate sci-fi panel lines, glowing fiber optics, illuminated futuristic UI details, digital glitch art reflections, dramatic neon rim lighting, synthwave aesthetic, 8k resolution, hyper-detailed material, photorealistic.
