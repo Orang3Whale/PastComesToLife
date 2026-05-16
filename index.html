@@ -6,16 +6,16 @@
 <title>旧物·新生 PastComesToLife</title>
 <style>
   :root {
-    --bg: #f5f0e8;
-    --card-bg: #faf7f2;
-    --text: #3d2b1f;
-    --text-secondary: #6b5d4f;
-    --accent: #8b6914;
-    --accent-light: #c9a84c;
-    --border: #d4c5b2;
-    --hero-from: #2d1b0f;
-    --hero-to: #4a3020;
-    --shadow: 0 2px 12px rgba(61,43,31,0.08);
+    --bg: #F7F3EE;
+    --card-bg: #FDFAF6;
+    --text: #4A3025;
+    --text-secondary: #7A5533;
+    --accent: #9C6B3F;
+    --accent-light: #C49A62;
+    --border: #D4C4AD;
+    --hero-from: #6B3A2A;
+    --hero-to: #4A3025;
+    --shadow: 0 2px 12px rgba(74,48,37,0.07);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
@@ -29,8 +29,8 @@
 
   /* ── Hero ── */
   .hero {
-    background: linear-gradient(135deg, var(--hero-from) 0%, #3d2b1f 40%, var(--hero-to) 100%);
-    color: #f5f0e8;
+    background: linear-gradient(135deg, var(--hero-from) 0%, #5A3228 40%, var(--hero-to) 100%);
+    color: #FDFAF6;
     text-align: center;
     padding: 80px 20px 70px;
     position: relative;
@@ -52,14 +52,14 @@
   }
   .hero .subtitle {
     font-size: clamp(1rem, 2.5vw, 1.35rem);
-    color: #c9a84c;
+    color: var(--accent-light);
     letter-spacing: 0.1em;
     position: relative;
     margin-bottom: 24px;
   }
   .hero .desc {
     font-size: 0.95rem;
-    color: #baa89a;
+    color: #D4BFA8;
     max-width: 640px;
     margin: 0 auto;
     position: relative;
@@ -83,7 +83,7 @@
     flex-wrap: wrap;
     gap: 8px 24px;
     padding: 24px 20px;
-    background: #e8ddd0;
+    background: #EFE7DD;
     font-size: 0.88rem;
     color: var(--text-secondary);
     letter-spacing: 0.04em;
@@ -144,7 +144,7 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     overflow: hidden;
-    background: #ede6db;
+    background: #F0E8DE;
   }
   .image-pair .img-box img {
     width: 100%;
@@ -159,10 +159,10 @@
     text-align: center;
     padding: 6px 0;
     letter-spacing: 0.04em;
-    background: #ede6db;
+    background: #F0E8DE;
   }
   .prompt-card {
-    background: #f5f0e8;
+    background: #F5F1EA;
     border: 1px dashed var(--border);
     border-radius: 8px;
     padding: 20px;
@@ -185,7 +185,7 @@
   /* ── 3D Viewer ── */
   .model-viewer-wrap {
     position: relative;
-    background: linear-gradient(180deg, #eae3d8 0%, #dcd3c6 100%);
+    background: linear-gradient(180deg, #F5F1EA 0%, #EBE3D8 100%);
     border: 1px solid var(--border);
     border-radius: 8px;
     overflow: hidden;
@@ -227,7 +227,7 @@
     z-index: 2;
   }
   .viewer-controls button {
-    background: rgba(250,247,242,0.9);
+    background: rgba(253,250,246,0.92);
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 6px 10px;
@@ -237,7 +237,7 @@
     letter-spacing: 0.03em;
     transition: background 0.2s;
   }
-  .viewer-controls button:hover { background: #fff; }
+  .viewer-controls button:hover { background: #FDFAF6; }
 
   /* ── Footer ── */
   .footer {
@@ -275,7 +275,7 @@
   }
   .add-guide code {
     display: block;
-    background: #ede6db;
+    background: #F0E8DE;
     padding: 12px 20px;
     border-radius: 6px;
     margin: 8px 0;
@@ -454,8 +454,8 @@ function setupViewer(id, modelUrl) {
 
   // Scene
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xeae3d8);
-  scene.fog = new THREE.Fog(0xeae3d8, 4, 18);
+  scene.background = new THREE.Color(0xF5F1EA);
+  scene.fog = new THREE.Fog(0xF5F1EA, 4, 18);
 
   // Camera
   const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 50);
@@ -472,7 +472,7 @@ function setupViewer(id, modelUrl) {
   wrap.appendChild(renderer.domElement);
 
   // Lighting
-  const ambient = new THREE.AmbientLight(0xfff5e8, 1.6);
+  const ambient = new THREE.AmbientLight(0xFFFAF4, 1.6);
   scene.add(ambient);
 
   const key = new THREE.DirectionalLight(0xffffff, 2.8);
@@ -488,7 +488,7 @@ function setupViewer(id, modelUrl) {
   key.shadow.bias = -0.0001;
   scene.add(key);
 
-  const fill = new THREE.DirectionalLight(0xc8b896, 1.2);
+  const fill = new THREE.DirectionalLight(0xD4B896, 1.2);
   fill.position.set(-3, 1, -2);
   scene.add(fill);
 
