@@ -12,6 +12,22 @@
       "original": "original.png",
       "style": "style.png",
       "model": "model.glb"
+    },
+    {
+      "id": "old_radio",
+      "title": "老旧的收音机",
+      "description": "一个老旧的收音机，经过风格化重构，保留了上世纪的风貌",
+      "original": "original.png",
+      "style": "style.png",
+      "model": "model.glb"
+    },
+    {
+      "id": "cyber_tv",
+      "title": "赛博朋克电视机",
+      "description": "一个老旧的收音机，经过风格化重构，注入赛博朋克的未来风格",
+      "original": "original.png",
+      "style": "style.png",
+      "model": "model.glb"
     }
   ]
 }
