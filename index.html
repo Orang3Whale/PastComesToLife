@@ -565,7 +565,7 @@ function setupViewer(id, modelUrl) {
       camera.position.set(
         worldCenter.x + viewDist * 0.8,
         worldCenter.y + viewDist * 0.55,
-        worldCenter.z + viewDist
+        worldCenter.z - viewDist
       );
       camera.lookAt(worldCenter);
       controls.update();
