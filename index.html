@@ -6,147 +6,205 @@
 <title>旧物·新生 PastComesToLife</title>
 <style>
   :root {
-    --bg: #F7F3EE;
-    --card-bg: #FDFAF6;
-    --text: #4A3025;
-    --text-secondary: #7A5533;
-    --accent: #9C6B3F;
-    --accent-light: #C49A62;
-    --border: #D4C4AD;
-    --hero-from: #6B3A2A;
-    --hero-to: #4A3025;
-    --shadow: 0 2px 12px rgba(74,48,37,0.07);
+    --page-bg: #6B3A2A;
+    --surface-bg: rgba(255,255,255,0.07);
+    --text: #FDFAF6;
+    --text-secondary: #D4BFA8;
+    --accent: #C49A62;
+    --accent-light: #D4B870;
+    --border: rgba(255,255,255,0.12);
+    --shadow: 0 4px 24px rgba(0,0,0,0.15);
+    --cover-bg-image: none;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html { scroll-behavior: smooth; }
-  body {
+  html, body {
     font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", Georgia, serif;
-    background: var(--bg);
+    background: #0D1117;
     color: var(--text);
     line-height: 1.7;
-    min-height: 100vh;
+    overflow: hidden;
+    height: 100dvh;
   }
 
-  /* ── Hero ── */
-  .hero {
-    background: linear-gradient(135deg, var(--hero-from) 0%, #5A3228 40%, var(--hero-to) 100%);
-    color: #FDFAF6;
-    text-align: center;
-    padding: 80px 20px 70px;
+  /* ── Scroll container ── */
+  main {
+    height: 100dvh;
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── Page base ── */
+  .page {
+    scroll-snap-align: start;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--page-bg);
+    transition: background-color 0.7s ease;
     position: relative;
     overflow: hidden;
   }
-  .hero::before {
+  .page-inner {
+    width: 100%;
+    max-width: 1300px;
+    padding: 32px 40px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── Cover Page ── */
+  #cover {
+    background: linear-gradient(160deg, #5A3228 0%, #3D2218 35%, #2B1810 70%, #1A1010 100%);
+    text-align: center;
+  }
+  #cover::before {
     content: "";
     position: absolute;
     inset: 0;
-    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M20 80 Q40 60 50 70 T80 80" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="0.5"/></svg>') repeat;
+    background-image: var(--cover-bg-image);
+    background-size: cover;
+    background-position: center;
+    opacity: 0.35;
+    z-index: 0;
+  }
+  #cover::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><defs><pattern id="g" width="60" height="60" patternUnits="userSpaceOnUse"><path d="M0 30 Q15 20 30 30 T60 30" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="0.8"/><path d="M0 45 Q15 35 30 45 T60 45" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="0.5"/><circle cx="30" cy="30" r="1.2" fill="rgba(255,255,255,0.06)"/><circle cx="0" cy="30" r="0.8" fill="rgba(255,255,255,0.04)"/><circle cx="60" cy="30" r="0.8" fill="rgba(255,255,255,0.04)"/></pattern></defs><rect width="200" height="200" fill="url(%23g)"/><path d="M20 0 L40 0 L60 20 L60 40 L40 60 L20 60 L0 40 L0 20 Z" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="0.5" transform="translate(70,70) scale(2)"/><path d="M20 0 L40 0 L60 20 L60 40 L40 60 L20 60 L0 40 L0 20 Z" fill="none" stroke="rgba(255,255,255,0.025)" stroke-width="0.5" transform="translate(10,10) scale(1.5)"/><circle cx="100" cy="100" r="18" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="0.5"/><circle cx="100" cy="100" r="30" fill="none" stroke="rgba(255,255,255,0.02)" stroke-width="0.4"/></svg>') repeat;
+    z-index: 0;
     pointer-events: none;
   }
-  .hero h1 {
-    font-size: clamp(2rem, 5vw, 3.4rem);
-    letter-spacing: 0.06em;
-    font-weight: 700;
-    position: relative;
-    margin-bottom: 12px;
-  }
-  .hero .subtitle {
-    font-size: clamp(1rem, 2.5vw, 1.35rem);
-    color: var(--accent-light);
-    letter-spacing: 0.1em;
-    position: relative;
-    margin-bottom: 24px;
-  }
-  .hero .desc {
-    font-size: 0.95rem;
-    color: #D4BFA8;
-    max-width: 640px;
-    margin: 0 auto;
-    position: relative;
-  }
-  .hero .scroll-hint {
-    margin-top: 40px;
-    position: relative;
-    animation: bounce 2s infinite;
-    opacity: 0.5;
-  }
-  .hero .scroll-hint svg { width: 28px; height: 28px; }
-  @keyframes bounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(10px); }
-  }
-
-  /* ── Pipeline Bar ── */
-  .pipeline {
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 8px 24px;
-    padding: 24px 20px;
-    background: #EFE7DD;
-    font-size: 0.88rem;
-    color: var(--text-secondary);
-    letter-spacing: 0.04em;
-  }
-  .pipeline span { white-space: nowrap; }
-  .pipeline .arrow { color: var(--accent); }
-
-  /* ── Section ── */
-  .container {
-    max-width: 1300px;
-    margin: 0 auto;
-    padding: 20px;
-  }
-  .example-section {
-    margin: 48px 0 64px;
-  }
-  .example-header {
-    text-align: center;
-    margin-bottom: 32px;
-  }
-  .example-header h2 {
-    font-size: 1.8rem;
-    color: var(--text);
-    letter-spacing: 0.05em;
-  }
-  .example-header p {
-    color: var(--text-secondary);
-    font-size: 0.95rem;
-    margin-top: 4px;
-  }
-
-  /* ── Example Card ── */
-  .example-card {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 28px;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 28px;
-    box-shadow: var(--shadow);
-  }
-  @media (max-width: 860px) {
-    .example-card { grid-template-columns: 1fr; }
-  }
-
-  .card-left {
+  .cover-content {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    align-items: center;
+    gap: 18px;
+    position: relative;
+    z-index: 1;
   }
+  .cover-content h1 {
+    font-size: clamp(2.8rem, 7vw, 5rem);
+    letter-spacing: 0.12em;
+    font-weight: 700;
+    color: #FDFAF6;
+    text-shadow: 0 2px 20px rgba(0,0,0,0.3);
+  }
+  .cover-content .subtitle {
+    font-size: clamp(0.95rem, 2vw, 1.2rem);
+    letter-spacing: 0.18em;
+    color: var(--accent-light);
+    text-transform: uppercase;
+  }
+  .cover-content .desc {
+    font-size: 0.92rem;
+    color: #C4A88B;
+    max-width: 520px;
+    line-height: 1.8;
+  }
+
+  /* ── Pipeline nodes ── */
+  .pipeline-nodes {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-top: 28px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .pipe-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .pipe-step .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.6;
+    transition: opacity 0.4s;
+  }
+  .pipe-step .label {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+  .pipe-connector {
+    width: 40px;
+    height: 1px;
+    background: var(--accent);
+    opacity: 0.3;
+    margin: 0 4px;
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin-top: 5px;
+  }
+
+  /* ── Scroll hint ── */
+  .scroll-hint {
+    margin-top: 36px;
+    animation: float 2.5s ease-in-out infinite;
+    opacity: 0.5;
+    cursor: pointer;
+  }
+  .scroll-hint svg {
+    width: 32px;
+    height: 32px;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); opacity: 0.4; }
+    50% { transform: translateY(12px); opacity: 0.8; }
+  }
+
+  /* ── Example Page ── */
+  .example-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    align-items: start;
+  }
+  @media (max-width: 860px) {
+    .example-grid {
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+    .model-viewer-wrap { min-height: 340px; }
+  }
+
+  .example-left {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .example-left h2 {
+    font-size: 1.6rem;
+    letter-spacing: 0.05em;
+    color: var(--text);
+  }
+  .example-left .ex-desc {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    margin-top: -8px;
+  }
+
   .image-pair {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
+    gap: 12px;
   }
-  .image-pair .img-box {
+  .img-box {
     border: 1px solid var(--border);
     border-radius: 8px;
     overflow: hidden;
-    background: #F0E8DE;
+    background: rgba(0,0,0,0.15);
   }
-  .image-pair .img-box img {
+  .img-box img {
     width: 100%;
     height: auto;
     display: block;
@@ -154,50 +212,47 @@
     aspect-ratio: 1 / 1;
   }
   .img-label {
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     color: var(--text-secondary);
     text-align: center;
-    padding: 6px 0;
+    padding: 5px 0;
     letter-spacing: 0.04em;
-    background: #F0E8DE;
+    background: rgba(0,0,0,0.12);
   }
+
   .prompt-card {
-    background: #F5F1EA;
+    background: var(--surface-bg);
     border: 1px dashed var(--border);
     border-radius: 8px;
-    padding: 20px;
+    padding: 16px 18px;
     text-align: center;
   }
   .prompt-card .prompt-label {
-    font-size: 0.78rem;
+    font-size: 0.7rem;
     color: var(--accent);
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
   .prompt-card .prompt-text {
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-style: italic;
     color: var(--text);
-    line-height: 1.6;
+    line-height: 1.5;
   }
 
   /* ── 3D Viewer ── */
   .model-viewer-wrap {
     position: relative;
-    background: linear-gradient(180deg, #F5F1EA 0%, #EBE3D8 100%);
+    background: rgba(0,0,0,0.2);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 10px;
     overflow: hidden;
     min-height: 420px;
     cursor: grab;
   }
   .model-viewer-wrap:active { cursor: grabbing; }
-  .model-viewer-wrap canvas {
-    display: block;
-    width: 100%;
-    height: 100%;
-  }
+  .model-viewer-wrap canvas { display: block; width: 100%; height: 100%; }
   .model-viewer-wrap .loading {
     position: absolute;
     inset: 0;
@@ -206,135 +261,125 @@
     align-items: center;
     justify-content: center;
     color: var(--text-secondary);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
   }
   .model-viewer-wrap .spinner {
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
     border: 3px solid var(--border);
     border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
   .viewer-controls {
     position: absolute;
-    bottom: 12px;
-    right: 12px;
+    bottom: 10px;
+    right: 10px;
     display: flex;
     gap: 6px;
     z-index: 2;
   }
   .viewer-controls button {
-    background: rgba(253,250,246,0.92);
+    background: var(--surface-bg);
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 6px 10px;
+    padding: 5px 10px;
     cursor: pointer;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     color: var(--text-secondary);
     letter-spacing: 0.03em;
     transition: background 0.2s;
+    backdrop-filter: blur(8px);
   }
-  .viewer-controls button:hover { background: #FDFAF6; }
+  .viewer-controls button:hover { background: rgba(255,255,255,0.1); }
 
-  /* ── Footer ── */
-  .footer {
-    text-align: center;
+  /* ── Footer Page ── */
+  #footer-page {
+    min-height: auto;
     padding: 40px 20px;
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-    border-top: 1px solid var(--border);
-    margin-top: 32px;
-  }
-  .footer a { color: var(--accent); text-decoration: none; }
-  .footer a:hover { text-decoration: underline; }
-
-  /* ── No examples state ── */
-  .empty-state {
+    background: #1A1512;
+    display: block;
     text-align: center;
-    padding: 80px 20px;
-    color: var(--text-secondary);
   }
-  .empty-state h3 { font-size: 1.3rem; margin-bottom: 8px; color: var(--text); }
-
-  /* ── Add example guide ── */
-  .add-guide {
-    background: var(--card-bg);
-    border: 1px dashed var(--border);
+  #footer-page .add-guide {
+    background: rgba(255,255,255,0.04);
+    border: 1px dashed rgba(255,255,255,0.1);
     border-radius: 12px;
     padding: 28px;
-    margin: 32px 0;
-    text-align: center;
+    margin: 0 auto 32px;
+    max-width: 700px;
   }
-  .add-guide h3 {
-    font-size: 1.1rem;
-    color: var(--text);
-    margin-bottom: 12px;
-  }
-  .add-guide code {
+  #footer-page .add-guide h3 { font-size: 1.1rem; margin-bottom: 12px; }
+  #footer-page .add-guide code {
     display: block;
-    background: #F0E8DE;
+    background: rgba(0,0,0,0.3);
     padding: 12px 20px;
     border-radius: 6px;
     margin: 8px 0;
     font-family: "SF Mono", "Fira Code", monospace;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     text-align: left;
     white-space: pre-wrap;
     word-break: break-all;
+    color: #C9D1D9;
+  }
+  #footer-page .footer-credit {
+    color: #8B949E;
+    font-size: 0.82rem;
+  }
+  #footer-page .footer-credit a { color: var(--accent); text-decoration: none; }
+
+  /* ── Nav Dots ── */
+  #nav-dots {
+    position: fixed;
+    right: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 100;
+  }
+  #nav-dots .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.25);
+    cursor: pointer;
+    transition: all 0.35s ease;
+    position: relative;
+  }
+  #nav-dots .dot:hover { background: rgba(255,255,255,0.5); }
+  #nav-dots .dot.active { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  #nav-dots .dot .tooltip {
+    position: absolute;
+    right: 22px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.7rem;
+    color: var(--text);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    letter-spacing: 0.04em;
+  }
+  #nav-dots .dot:hover .tooltip { opacity: 1; }
+  @media (max-width: 600px) {
+    #nav-dots { right: 8px; gap: 10px; }
+    #nav-dots .dot { width: 8px; height: 8px; }
+    #nav-dots .dot .tooltip { display: none; }
+    .pipe-connector { width: 20px; }
   }
 </style>
 </head>
 <body>
 
-<!-- Hero -->
-<header class="hero">
-  <h1 id="projectTitle">旧物·新生</h1>
-  <div class="subtitle" id="projectSubtitle">PastComesToLife</div>
-  <p class="desc" id="projectDesc"></p>
-  <div class="scroll-hint">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-      <path d="M12 5v14M5 12l7 7 7-7"/>
-    </svg>
-  </div>
-</header>
+<main id="main"></main>
 
-<!-- Pipeline bar -->
-<div class="pipeline">
-  <span>单张图像</span><span class="arrow">→</span>
-  <span>SF3D 三维重建</span><span class="arrow">→</span>
-  <span>六视角渲染</span><span class="arrow">→</span>
-  <span>InstantStyle 风格化</span><span class="arrow">→</span>
-  <span>贴图回贴</span><span class="arrow">→</span>
-  <span>风格化三维模型</span>
-</div>
-
-<!-- Examples container -->
-<main class="container" id="examplesContainer"></main>
-
-<!-- Add example guide -->
-<!-- <section class="container">
-  <div class="add-guide">
-    <h3>添加新样例</h3>
-    <p>在 <code>examples/</code> 目录下创建新文件夹，放入以下文件：</p>
-    <code>examples/&lt;name&gt;/
-  ├── original.png   (原始物体图片，支持 .png .jpg .webp 等)
-  ├── style.png      (风格参考图，支持 .png .jpg .webp 等)
-  ├── prompt.md      (提示词文本)
-  └── model.glb      (风格化后的三维模型)</code>
-    <p>在 <code>examples.json</code> 中添加对应条目，若文件名非默认需指定 <code>"original"</code>、<code>"style"</code>、<code>"model"</code> 字段。</p>
-  </div>
-</section> -->
-
-<!-- Footer -->
-<footer class="footer">
-  <p>旧物·新生 PastComesToLife &mdash; 老物件三维化与风格重构</p>
-  <p style="margin-top:4px">
-    <a href="https://github.com/Orang3Whale/PastComesToLife" target="_blank" rel="noopener">GitHub</a>
-  </p>
-</footer>
+<nav id="nav-dots"></nav>
 
 <script type="importmap">
 {
@@ -350,9 +395,14 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
-// ── Fetch project config & render page ──
+// ── State ──
+let config = null;
+let activePageIdx = 0;
+const viewers = {};
+const initialized = {}; // track which viewers have been set up
+
+// ── Init ──
 async function init() {
-  let config;
   try {
     const resp = await fetch("examples.json");
     config = await resp.json();
@@ -360,108 +410,301 @@ async function init() {
     config = { project: {}, examples: [] };
   }
 
-  document.getElementById("projectTitle").textContent = config.project.title || "旧物·新生";
-  document.getElementById("projectSubtitle").textContent = config.project.subtitle || "PastComesToLife";
-  document.getElementById("projectDesc").textContent = config.project.description || "";
   document.title = config.project.title || "旧物·新生 PastComesToLife";
-
-  const container = document.getElementById("examplesContainer");
-  if (!config.examples || config.examples.length === 0) {
-    container.innerHTML = `<div class="empty-state">
-      <h3>暂无样例</h3>
-      <p>请按照下方指引添加样例文件</p>
-    </div>`;
-    return;
-  }
-
-  for (const ex of config.examples) {
-    ex.original = ex.original || "original.png";
-    ex.style = ex.style || "style.png";
-    ex.model = ex.model || "model.glb";
-    await renderExample(container, ex);
-  }
+  buildPages();
+  buildNavDots();
+  observePages();
 }
 
-// ── Render one example ──
-async function renderExample(container, ex) {
-  const base = `examples/${ex.id}`;
+// ── Build all pages ──
+function buildPages() {
+  const main = document.getElementById("main");
 
-  // Fetch prompt text
-  let promptText = "";
-  try {
-    const resp = await fetch(`${base}/prompt.md`);
-    if (resp.ok) promptText = await resp.text();
-  } catch (e) {}
-
-  // Build section
-  const section = document.createElement("div");
-  section.className = "example-section";
-  section.innerHTML = `
-    <div class="example-header">
-      <h2>${escapeHtml(ex.title || ex.id)}</h2>
-      ${ex.description ? `<p>${escapeHtml(ex.description)}</p>` : ""}
-    </div>
-    <div class="example-card">
-      <div class="card-left">
-        <div class="image-pair">
-          <div>
-            <div class="img-box">
-              <img src="${base}/${ex.original}" alt="原始图片" loading="lazy"
-                   onerror="this.parentElement.parentElement.style.display='none'">
-            </div>
-            <div class="img-label">原始图片</div>
-          </div>
-          <div>
-            <div class="img-box">
-              <img src="${base}/${ex.style}" alt="风格参考图" loading="lazy"
-                   onerror="this.parentElement.parentElement.style.display='none'">
-            </div>
-            <div class="img-label">风格参考图</div>
-          </div>
+  // ── Cover page ──
+  const cover = document.createElement("section");
+  cover.id = "cover";
+  cover.className = "page";
+  cover.innerHTML = `
+    <div class="page-inner">
+      <div class="cover-content">
+        <h1>${escapeHtml(config.project.title || "旧物·新生")}</h1>
+        <div class="subtitle">${escapeHtml(config.project.subtitle || "PastComesToLife")}</div>
+        <p class="desc">${escapeHtml(config.project.description || "")}</p>
+        <div class="pipeline-nodes">
+          <span class="pipe-step"><span class="dot"></span><span class="label">单张图像</span></span>
+          <span class="pipe-connector"></span>
+          <span class="pipe-step"><span class="dot"></span><span class="label">SF3D 三维重建</span></span>
+          <span class="pipe-connector"></span>
+          <span class="pipe-step"><span class="dot"></span><span class="label">六视角渲染</span></span>
+          <span class="pipe-connector"></span>
+          <span class="pipe-step"><span class="dot"></span><span class="label">InstantStyle 风格化</span></span>
+          <span class="pipe-connector"></span>
+          <span class="pipe-step"><span class="dot"></span><span class="label">贴图回贴</span></span>
+          <span class="pipe-connector"></span>
+          <span class="pipe-step"><span class="dot"></span><span class="label">风格化三维模型</span></span>
         </div>
-        ${promptText ? `
-        <div class="prompt-card">
-          <div class="prompt-label">提示词 Prompt</div>
-          <div class="prompt-text">${escapeHtml(promptText.trim())}</div>
-        </div>` : ""}
-      </div>
-      <div class="model-viewer-wrap" id="viewer-${ex.id}">
-        <div class="loading">
-          <div class="spinner"></div>
-          <span>加载三维模型中...</span>
-        </div>
-        <div class="viewer-controls">
-          <button title="重置视角" id="reset-${ex.id}">重置</button>
-          <button title="自动旋转" id="auto-${ex.id}">旋转</button>
+        <div class="scroll-hint" title="向下滚动">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 5v14M5 12l7 7 7-7"/>
+          </svg>
         </div>
       </div>
     </div>
   `;
-  container.appendChild(section);
+  main.appendChild(cover);
 
-  // Set up 3D viewer
-  setupViewer(ex.id, `${base}/${ex.model}`);
+  // ── Example pages ──
+  if (config.examples) {
+    config.examples.forEach((ex, i) => {
+      ex.original = ex.original || "original.png";
+      ex.style = ex.style || "style.png";
+      ex.model = ex.model || "model.glb";
+      ex._id = ex.id;
+      ex._idx = i;
+
+      const page = document.createElement("section");
+      page.className = "page";
+      page.id = `example-${ex.id}`;
+      page.dataset.exampleId = ex.id;
+      page.dataset.exampleIdx = i;
+      page.innerHTML = buildExampleHTML(ex);
+      main.appendChild(page);
+    });
+  }
+
+  // ── Footer page ──
+  const footer = document.createElement("section");
+  footer.className = "page";
+  footer.id = "footer-page";
+  footer.innerHTML = `
+    <div class="add-guide">
+      <h3>添加新样例</h3>
+      <p style="color:#8B949E;font-size:0.88rem;">在 <code style="display:inline;background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:3px;font-size:0.8rem;">examples/</code> 目录下创建新文件夹，放入以下文件：</p>
+      <code>examples/&lt;name&gt;/
+  ├── original.png   (原始物体图片)
+  ├── style.png      (风格参考图)
+  ├── prompt.md      (提示词文本)
+  └── model.glb      (风格化后的三维模型)</code>
+      <p style="color:#8B949E;font-size:0.85rem;">在 <code style="display:inline;background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:3px;font-size:0.8rem;">examples.json</code> 中添加条目并指定 <code style="display:inline;background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:3px;font-size:0.8rem;">"theme"</code> 即可。</p>
+    </div>
+    <p class="footer-credit">
+      旧物·新生 PastComesToLife &mdash; 老物件三维化与风格重构<br>
+      <a href="https://github.com/Orang3Whale/PastComesToLife" target="_blank" rel="noopener">GitHub</a>
+    </p>
+  `;
+  main.appendChild(footer);
+}
+
+function buildExampleHTML(ex) {
+  const base = `examples/${ex.id}`;
+  return `
+    <div class="page-inner">
+      <div class="example-grid">
+        <div class="example-left">
+          <h2>${escapeHtml(ex.title || ex.id)}</h2>
+          ${ex.description ? `<p class="ex-desc">${escapeHtml(ex.description)}</p>` : ""}
+          <div class="image-pair">
+            <div>
+              <div class="img-box">
+                <img src="${base}/${ex.original}" alt="原始图片" loading="lazy"
+                     onerror="this.parentElement.parentElement.style.display='none'">
+              </div>
+              <div class="img-label">原始图片</div>
+            </div>
+            <div>
+              <div class="img-box">
+                <img src="${base}/${ex.style}" alt="风格参考图" loading="lazy"
+                     onerror="this.parentElement.parentElement.style.display='none'">
+              </div>
+              <div class="img-label">风格参考图</div>
+            </div>
+          </div>
+          <div class="prompt-card" id="prompt-${ex.id}">
+            <div class="prompt-label">提示词 Prompt</div>
+            <div class="prompt-text"></div>
+          </div>
+        </div>
+        <div class="model-viewer-wrap" id="viewer-${ex.id}">
+          <div class="loading">
+            <div class="spinner"></div>
+            <span>加载三维模型中...</span>
+          </div>
+          <div class="viewer-controls">
+            <button title="重置视角" id="reset-${ex.id}">重置</button>
+            <button title="自动旋转" id="auto-${ex.id}">旋转</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── Nav dots ──
+function buildNavDots() {
+  const nav = document.getElementById("nav-dots");
+  const total = 1 + (config.examples ? config.examples.length : 0) + 1; // cover + examples + footer
+  const labels = ["封面", ...(config.examples ? config.examples.map(e => e.title) : []), "更多"];
+
+  for (let i = 0; i < total; i++) {
+    const dot = document.createElement("div");
+    dot.className = "dot" + (i === 0 ? " active" : "");
+    dot.innerHTML = `<span class="tooltip">${labels[i]}</span>`;
+    dot.addEventListener("click", () => scrollToPage(i));
+    nav.appendChild(dot);
+  }
+}
+
+function scrollToPage(idx) {
+  const pages = document.querySelectorAll(".page");
+  if (pages[idx]) {
+    pages[idx].scrollIntoView({ behavior: "smooth" });
+  }
+}
+
+// ── IntersectionObserver ──
+function observePages() {
+  const pages = document.querySelectorAll(".page");
+  const dots = document.querySelectorAll("#nav-dots .dot");
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+          const idx = Array.from(pages).indexOf(entry.target);
+          if (idx !== activePageIdx && idx >= 0) {
+            activePageIdx = idx;
+            updateActiveDot(dots, idx);
+            applyTheme(idx);
+          }
+        }
+      });
+    },
+    { threshold: [0.5] }
+  );
+  pages.forEach((p) => observer.observe(p));
+
+  // Lazy-init observers for 3D viewers
+  if (config.examples) {
+    const lazyObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const id = entry.target.dataset.exampleId;
+            if (id && !initialized[id]) {
+              initExample(id);
+              lazyObserver.unobserve(entry.target);
+            }
+          }
+        });
+      },
+      { rootMargin: "200px" }
+    );
+    config.examples.forEach((ex) => {
+      const page = document.getElementById(`example-${ex.id}`);
+      if (page) lazyObserver.observe(page);
+    });
+  }
+}
+
+function updateActiveDot(dots, idx) {
+  dots.forEach((d, i) => d.classList.toggle("active", i === idx));
+}
+
+// ── Theme application ──
+function applyTheme(idx) {
+  const pages = document.querySelectorAll(".page");
+  const total = pages.length;
+
+  // idx 0 = cover, last = footer, others = examples
+  if (idx === 0) {
+    // Cover theme (defaults)
+    setThemeVars({
+      "page-bg": "#5A3228",
+      "surface-bg": "rgba(255,255,255,0.07)",
+      text: "#FDFAF6",
+      "text-secondary": "#D4BFA8",
+      accent: "#C49A62",
+      "accent-light": "#D4B870",
+      border: "rgba(255,255,255,0.12)"
+    });
+  } else if (idx === total - 1) {
+    // Footer theme
+    setThemeVars({
+      "page-bg": "#1A1512",
+      "surface-bg": "rgba(255,255,255,0.04)",
+      text: "#C9D1D9",
+      "text-secondary": "#8B949E",
+      accent: "#C49A62",
+      "accent-light": "#D4B870",
+      border: "rgba(255,255,255,0.1)"
+    });
+  } else {
+    // Example theme
+    const exIdx = idx - 1;
+    const ex = config.examples[exIdx];
+    if (ex && ex.theme) {
+      const t = ex.theme;
+      setThemeVars({
+        "page-bg": t.primary,
+        "surface-bg": hexToRgba(t.surface, 0.7),
+        text: t.text,
+        "text-secondary": t.textSecondary,
+        accent: t.accent,
+        "accent-light": t.accentLight,
+        border: hexToRgba(t.border, 0.5)
+      });
+      // Update 3D viewer scene if already initialized
+      if (initialized[ex.id] && viewers[ex.id]) {
+        updateViewerTheme(ex.id, t);
+      }
+    }
+  }
+}
+
+function setThemeVars(vars) {
+  const root = document.documentElement;
+  Object.entries(vars).forEach(([k, v]) => {
+    root.style.setProperty(`--${k}`, v);
+  });
+}
+
+// ── Initialize one example (lazy) ──
+async function initExample(id) {
+  const ex = config.examples.find(e => e.id === id);
+  if (!ex) return;
+
+  initialized[id] = true;
+
+  // Fetch prompt
+  const base = `examples/${id}`;
+  try {
+    const resp = await fetch(`${base}/prompt.md`);
+    if (resp.ok) {
+      const text = await resp.text();
+      const el = document.getElementById(`prompt-${id}`);
+      if (el) el.querySelector(".prompt-text").textContent = text.trim();
+    }
+  } catch (e) {}
+
+  // Setup 3D viewer
+  setupViewer(id, `${base}/${ex.model}`, ex.theme);
 }
 
 // ── 3D Viewer ──
-const viewers = {};
-function setupViewer(id, modelUrl) {
+function setupViewer(id, modelUrl, theme) {
   const wrap = document.getElementById(`viewer-${id}`);
   if (!wrap) return;
 
   const width = wrap.clientWidth;
-  const height = Math.max(420, wrap.clientHeight || 420);
+  const height = Math.max(420, wrap.clientHeight);
 
-  // Scene
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xF5F1EA);
-  scene.fog = new THREE.Fog(0xF5F1EA, 4, 18);
+  const bgColor = theme ? new THREE.Color(parseInt(theme.viewerBg.replace("#", ""), 16)) : new THREE.Color(0x1B2640);
+  scene.background = bgColor;
+  scene.fog = new THREE.Fog(bgColor, 4, 18);
 
-  // Camera
   const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 50);
   camera.position.set(3, 2.2, 4.5);
 
-  // Renderer
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(width, height, false);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -472,8 +715,13 @@ function setupViewer(id, modelUrl) {
   wrap.appendChild(renderer.domElement);
 
   // Lighting
-  const ambient = new THREE.AmbientLight(0xFFFAF4, 1.6);
+  const ambientColor = theme ? parseInt(theme.ambientColor, 16) : 0x3A4068;
+  const ambientIntensity = theme ? theme.ambientIntensity : 1.1;
+  const ambient = new THREE.AmbientLight(ambientColor, ambientIntensity);
   scene.add(ambient);
+
+  const fillColor = theme ? parseInt(theme.fillColor, 16) : 0xC8B870;
+  const fillIntensity = theme ? theme.fillIntensity : 1.2;
 
   const key = new THREE.DirectionalLight(0xffffff, 2.8);
   key.position.set(5, 8, 5);
@@ -488,7 +736,7 @@ function setupViewer(id, modelUrl) {
   key.shadow.bias = -0.0001;
   scene.add(key);
 
-  const fill = new THREE.DirectionalLight(0xD4B896, 1.2);
+  const fill = new THREE.DirectionalLight(fillColor, fillIntensity);
   fill.position.set(-3, 1, -2);
   scene.add(fill);
 
@@ -517,21 +765,17 @@ function setupViewer(id, modelUrl) {
   controls.autoRotateSpeed = 1.2;
   controls.update();
 
-  // Store viewer state
-  viewers[id] = { scene, camera, renderer, controls, wrap, autoRotate: false };
+  viewers[id] = { scene, camera, renderer, controls, wrap, ground, ambient, fill, autoRotate: false };
 
   // Load model
   const loader = new GLTFLoader();
   loader.load(
     modelUrl,
     (gltf) => {
-      // Remove loading
       const loadingEl = wrap.querySelector(".loading");
       if (loadingEl) loadingEl.remove();
 
       const model = gltf.scene;
-
-      // Center and scale
       const box = new THREE.Box3().setFromObject(model);
       const center = box.getCenter(new THREE.Vector3());
       const size = box.getSize(new THREE.Vector3());
@@ -540,7 +784,6 @@ function setupViewer(id, modelUrl) {
       model.scale.setScalar(scale);
       model.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
 
-      // Enable shadows on all meshes
       model.traverse((node) => {
         if (node.isMesh) {
           node.castShadow = true;
@@ -550,16 +793,13 @@ function setupViewer(id, modelUrl) {
 
       scene.add(model);
 
-      // Compute world-space bounding box after scaling & positioning
       const worldBox = new THREE.Box3().setFromObject(model);
       const worldCenter = worldBox.getCenter(new THREE.Vector3());
       const worldBottom = worldBox.min.y;
 
-      // Ground shadow plane at model's actual bottom
       ground.position.y = worldBottom;
-
-      // Point controls & camera at model's geometric center
       controls.target.copy(worldCenter);
+
       const worldSize = worldBox.getSize(new THREE.Vector3());
       const viewDist = Math.max(worldSize.x, worldSize.y, worldSize.z) * 1.5;
       camera.position.set(
@@ -570,37 +810,34 @@ function setupViewer(id, modelUrl) {
       camera.lookAt(worldCenter);
       controls.update();
 
-      // Store for reset
       viewers[id].model = model;
       viewers[id].worldCenter = worldCenter;
       viewers[id].initCameraPos = camera.position.clone();
     },
     undefined,
-    (err) => {
+    () => {
       const loadingEl = wrap.querySelector(".loading");
-      if (loadingEl) {
-        loadingEl.innerHTML = `<span>模型加载失败</span>`;
-      }
+      if (loadingEl) loadingEl.innerHTML = `<span>模型加载失败</span>`;
     }
   );
 
-  // Event handlers for viewer buttons
+  // Event handlers
   document.getElementById(`reset-${id}`).addEventListener("click", () => {
     const v = viewers[id];
     if (!v || !v.worldCenter) return;
-    camera.position.copy(v.initCameraPos);
-    controls.target.copy(v.worldCenter);
-    controls.update();
+    v.camera.position.copy(v.initCameraPos);
+    v.controls.target.copy(v.worldCenter);
+    v.controls.update();
   });
   document.getElementById(`auto-${id}`).addEventListener("click", () => {
     const v = viewers[id];
     if (!v) return;
     v.autoRotate = !v.autoRotate;
-    controls.autoRotate = v.autoRotate;
+    v.controls.autoRotate = v.autoRotate;
     document.getElementById(`auto-${id}`).textContent = v.autoRotate ? "停止" : "旋转";
   });
 
-  // Resize observer
+  // Resize
   const resizeObserver = new ResizeObserver(() => {
     const w = wrap.clientWidth;
     const h = Math.max(420, wrap.clientHeight);
@@ -613,7 +850,6 @@ function setupViewer(id, modelUrl) {
   resizeObserver.observe(wrap);
   viewers[id].resizeObserver = resizeObserver;
 
-  // Animation loop
   function animate() {
     if (!viewers[id]) return;
     requestAnimationFrame(animate);
@@ -623,18 +859,52 @@ function setupViewer(id, modelUrl) {
   animate();
 }
 
+// ── Update viewer theme when switching pages ──
+function updateViewerTheme(id, theme) {
+  const v = viewers[id];
+  if (!v) return;
+
+  const bgColor = new THREE.Color(parseInt(theme.viewerBg.replace("#", ""), 16));
+  v.scene.background = bgColor;
+  v.scene.fog = new THREE.Fog(bgColor, 4, 18);
+
+  v.ambient.color.set(parseInt(theme.ambientColor, 16));
+  v.ambient.intensity = theme.ambientIntensity;
+  v.fill.color.set(parseInt(theme.fillColor, 16));
+  v.fill.intensity = theme.fillIntensity;
+}
+
+// ── Keyboard navigation ──
+document.addEventListener("keydown", (e) => {
+  const pages = document.querySelectorAll(".page");
+  if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+    e.preventDefault();
+    const next = Math.min(activePageIdx + 1, pages.length - 1);
+    scrollToPage(next);
+  } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+    e.preventDefault();
+    const prev = Math.max(activePageIdx - 1, 0);
+    scrollToPage(prev);
+  }
+});
+
 // ── Utility ──
 function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
 }
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 
 // ── Kick off ──
 init();
 </script>
 
-<!-- Google Fonts for Noto Serif SC -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">

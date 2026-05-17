@@ -11,7 +11,22 @@
       "description": "一把普通的椅子，经过风格化重构，融入梵高《星空》的流动笔触与色彩",
       "original": "original.png",
       "style": "style.png",
-      "model": "model.glb"
+      "model": "model.glb",
+      "theme": {
+        "primary": "#1B2640",
+        "surface": "#243050",
+        "text": "#E8D5A3",
+        "textSecondary": "#A09570",
+        "accent": "#C9A84C",
+        "accentLight": "#D4B870",
+        "border": "#354868",
+        "viewerBg": "#1B2640",
+        "viewerFog": "#1B2640",
+        "ambientColor": "0x3A4068",
+        "ambientIntensity": 1.1,
+        "fillColor": "0xC8B870",
+        "fillIntensity": 1.2
+      }
     },
     {
       "id": "old_radio",
@@ -19,15 +34,45 @@
       "description": "一个老旧的收音机，经过风格化重构，保留了上世纪的风貌",
       "original": "original.png",
       "style": "style.png",
-      "model": "model.glb"
+      "model": "model.glb",
+      "theme": {
+        "primary": "#3D2B1F",
+        "surface": "#4A3828",
+        "text": "#E8DCC8",
+        "textSecondary": "#C4A882",
+        "accent": "#B88645",
+        "accentLight": "#D4A862",
+        "border": "#5A4530",
+        "viewerBg": "#3D2B1F",
+        "viewerFog": "#3D2B1F",
+        "ambientColor": "0x5C4030",
+        "ambientIntensity": 1.3,
+        "fillColor": "0xD4B896",
+        "fillIntensity": 1.1
+      }
     },
     {
       "id": "cyber_tv",
       "title": "赛博朋克电视机",
-      "description": "一个老旧的收音机，经过风格化重构，注入赛博朋克的未来风格",
+      "description": "一个老旧的电视机，经过风格化重构，注入赛博朋克的未来风格",
       "original": "original.png",
       "style": "style.png",
-      "model": "model.glb"
+      "model": "model.glb",
+      "theme": {
+        "primary": "#0D1117",
+        "surface": "#161B22",
+        "text": "#C9D1D9",
+        "textSecondary": "#8B949E",
+        "accent": "#00E5FF",
+        "accentLight": "#5CEFFF",
+        "border": "#21262D",
+        "viewerBg": "#0D1117",
+        "viewerFog": "#0D1117",
+        "ambientColor": "0x1A2540",
+        "ambientIntensity": 1.0,
+        "fillColor": "0xFF6B9D",
+        "fillIntensity": 0.9
+      }
     }
   ]
 }
