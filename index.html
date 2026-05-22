@@ -17,6 +17,9 @@
     --cover-bg-image: none;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html {
+    font-size: 18px;
+  }
   html, body {
     font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", Georgia, serif;
     background: #0D1117;
@@ -100,7 +103,7 @@
     text-transform: uppercase;
   }
   .cover-content .desc {
-    font-size: 0.92rem;
+    font-size: 1rem;
     color: #C4A88B;
     max-width: 520px;
     line-height: 1.8;
@@ -122,15 +125,15 @@
     gap: 8px;
   }
   .pipe-step .dot {
-    width: 10px;
-    height: 10px;
+    width: 11px;
+    height: 11px;
     border-radius: 50%;
     background: var(--accent);
     opacity: 0.6;
     transition: opacity 0.4s;
   }
   .pipe-step .label {
-    font-size: 0.72rem;
+    font-size: 0.82rem;
     color: var(--text-secondary);
     letter-spacing: 0.05em;
     white-space: nowrap;
@@ -188,7 +191,7 @@
     color: var(--text);
   }
   .example-left .ex-desc {
-    font-size: 0.88rem;
+    font-size: 0.95rem;
     color: var(--text-secondary);
     margin-top: -8px;
   }
@@ -212,7 +215,7 @@
     aspect-ratio: 1 / 1;
   }
   .img-label {
-    font-size: 0.72rem;
+    font-size: 0.82rem;
     color: var(--text-secondary);
     text-align: center;
     padding: 5px 0;
@@ -228,7 +231,7 @@
     text-align: center;
   }
   .prompt-card .prompt-label {
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     color: var(--accent);
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -285,9 +288,9 @@
     background: var(--surface-bg);
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 5px 10px;
+    padding: 6px 12px;
     cursor: pointer;
-    font-size: 0.72rem;
+    font-size: 0.8rem;
     color: var(--text-secondary);
     letter-spacing: 0.03em;
     transition: background 0.2s;
@@ -297,37 +300,72 @@
 
   /* ── Footer Page ── */
   #footer-page {
-    min-height: auto;
+    min-height: 50vh;
     padding: 40px 20px;
     background: #1A1512;
-    display: block;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     text-align: center;
   }
-  #footer-page .add-guide {
-    background: rgba(255,255,255,0.04);
-    border: 1px dashed rgba(255,255,255,0.1);
-    border-radius: 12px;
-    padding: 28px;
-    margin: 0 auto 32px;
-    max-width: 700px;
+  .back-to-top {
+    position: relative;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.05);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.35s ease;
+    margin-bottom: 32px;
+    backdrop-filter: blur(8px);
   }
-  #footer-page .add-guide h3 { font-size: 1.1rem; margin-bottom: 12px; }
-  #footer-page .add-guide code {
-    display: block;
-    background: rgba(0,0,0,0.3);
-    padding: 12px 20px;
-    border-radius: 6px;
-    margin: 8px 0;
-    font-family: "SF Mono", "Fira Code", monospace;
-    font-size: 0.82rem;
-    text-align: left;
-    white-space: pre-wrap;
-    word-break: break-all;
-    color: #C9D1D9;
+  .back-to-top:hover {
+    border-color: var(--accent);
+    background: rgba(255,255,255,0.1);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
   }
+  .back-to-top svg {
+    width: 28px;
+    height: 28px;
+    stroke: rgba(255,255,255,0.6);
+    transition: stroke 0.35s;
+  }
+  .back-to-top:hover svg { stroke: var(--accent); }
+  /* Floating bubbles */
+  .back-to-top .bubble {
+    position: absolute;
+    border-radius: 50%;
+    background: var(--accent);
+    pointer-events: none;
+    opacity: 0;
+  }
+  .back-to-top:hover .bubble {
+    animation: bubbleRise 1.2s ease-out infinite;
+  }
+  .back-to-top .bubble:nth-child(1) { width: 6px; height: 6px; top: 50%; left: 50%; animation-delay: 0s; }
+  .back-to-top .bubble:nth-child(2) { width: 4px; height: 4px; top: 50%; left: 50%; animation-delay: 0.3s; }
+  .back-to-top .bubble:nth-child(3) { width: 8px; height: 8px; top: 50%; left: 50%; animation-delay: 0.15s; }
+  .back-to-top .bubble:nth-child(4) { width: 5px; height: 5px; top: 50%; left: 50%; animation-delay: 0.45s; }
+  .back-to-top .bubble:nth-child(5) { width: 7px; height: 7px; top: 50%; left: 50%; animation-delay: 0.6s; }
+  @keyframes bubbleRise {
+    0% { opacity: 0; transform: translate(0, 0) scale(0.3); }
+    20% { opacity: 0.7; }
+    100% { opacity: 0; transform: translate(var(--bx), var(--by)) scale(1); }
+  }
+  .back-to-top .bubble:nth-child(1) { --bx: 20px; --by: -50px; }
+  .back-to-top .bubble:nth-child(2) { --bx: -18px; --by: -40px; }
+  .back-to-top .bubble:nth-child(3) { --bx: 28px; --by: -30px; }
+  .back-to-top .bubble:nth-child(4) { --bx: -24px; --by: -48px; }
+  .back-to-top .bubble:nth-child(5) { --bx: 10px; --by: -60px; }
   #footer-page .footer-credit {
     color: #8B949E;
-    font-size: 0.82rem;
+    font-size: 0.95rem;
   }
   #footer-page .footer-credit a { color: var(--accent); text-decoration: none; }
 
@@ -343,8 +381,8 @@
     z-index: 100;
   }
   #nav-dots .dot {
-    width: 10px;
-    height: 10px;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
     background: rgba(255,255,255,0.25);
     cursor: pointer;
@@ -358,7 +396,7 @@
     right: 22px;
     top: 50%;
     transform: translateY(-50%);
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     color: var(--text);
     white-space: nowrap;
     opacity: 0;
@@ -368,8 +406,8 @@
   }
   #nav-dots .dot:hover .tooltip { opacity: 1; }
   @media (max-width: 600px) {
-    #nav-dots { right: 8px; gap: 10px; }
-    #nav-dots .dot { width: 8px; height: 8px; }
+    #nav-dots { right: 10px; gap: 12px; }
+    #nav-dots .dot { width: 10px; height: 10px; }
     #nav-dots .dot .tooltip { display: none; }
     .pipe-connector { width: 20px; }
   }
@@ -477,22 +515,22 @@ function buildPages() {
   footer.className = "page";
   footer.id = "footer-page";
   footer.innerHTML = `
-    <div class="add-guide">
-      <h3>添加新样例</h3>
-      <p style="color:#8B949E;font-size:0.88rem;">在 <code style="display:inline;background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:3px;font-size:0.8rem;">examples/</code> 目录下创建新文件夹，放入以下文件：</p>
-      <code>examples/&lt;name&gt;/
-  ├── original.png   (原始物体图片)
-  ├── style.png      (风格参考图)
-  ├── prompt.md      (提示词文本)
-  └── model.glb      (风格化后的三维模型)</code>
-      <p style="color:#8B949E;font-size:0.85rem;">在 <code style="display:inline;background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:3px;font-size:0.8rem;">examples.json</code> 中添加条目并指定 <code style="display:inline;background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:3px;font-size:0.8rem;">"theme"</code> 即可。</p>
+    <div class="back-to-top" id="backToTop" title="返回顶部">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+        <path d="M12 20V4M5 11l7-7 7 7"/>
+      </svg>
+      <span class="bubble"></span><span class="bubble"></span><span class="bubble"></span><span class="bubble"></span><span class="bubble"></span>
     </div>
     <p class="footer-credit">
-      旧物·新生 PastComesToLife &mdash; 老物件三维化与风格重构<br>
+      旧物·新生 PastComesToLife &mdash; ${escapeHtml(config.project.subtitle || "老照片里的物件三维化与风格重构")}<br>
       <a href="https://github.com/Orang3Whale/PastComesToLife" target="_blank" rel="noopener">GitHub</a>
     </p>
   `;
   main.appendChild(footer);
+
+  document.getElementById("backToTop").addEventListener("click", () => {
+    document.querySelector(".page").scrollIntoView({ behavior: "smooth" });
+  });
 }
 
 function buildExampleHTML(ex) {
