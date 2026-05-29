@@ -1,0 +1,6 @@
+[submodule "stable-fast-3d"]
+	path = stable-fast-3d
+	url = https://github.com/Stability-AI/stable-fast-3d.git
+[submodule "InstantStyle"]
+	path = InstantStyle
+	url = https://github.com/instantX-research/InstantStyle.git

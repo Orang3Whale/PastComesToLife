@@ -36,6 +36,9 @@ scipy>=1.15.0
 opencv-python-headless>=4.0.0
 rembg>=2.0.57
 
+# --- SF3D 额外依赖 ---
+open_clip_torch>=2.24.0
+
 # --- 科学计算 / 工具 ---
 einops>=0.7.0
 omegaconf>=2.3.0
