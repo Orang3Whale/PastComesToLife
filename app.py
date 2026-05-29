@@ -1,17 +1,114 @@
 from __future__ import annotations
 
 import html
+import os
+import sys
 import time
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
 import gradio as gr
 
 
+PROJECT_ROOT = Path(__file__).resolve().parent
+PIPELINE_ROOT = PROJECT_ROOT / "stylized-3d-pipeline"
+if str(PIPELINE_ROOT) not in sys.path:
+    sys.path.insert(0, str(PIPELINE_ROOT))
+
+from lib.io_paths import create_run_tree, resolve_run_dir, write_json
+from scripts.step1_preprocess import run_step as run_preprocess_step
+from scripts.step2_sf3d import run_step as run_sf3d_step
+from scripts.step3_instantstyle import run_step as run_instantstyle_step
+from scripts.step3_sample_views import run_step as run_sample_views_step
+from scripts.step4_retexture import run_step as run_retexture_step
+from scripts.step5_build_viewer import run_step as run_viewer_step
+
+
 APP_TITLE = "万物赋新台"
 APP_SUBTITLE = "岁月器物的三维留存与跨次元重塑"
-PLACEHOLDER_MODEL = Path(__file__).with_name("mesh_stylized4.glb")#当前只是占位
+DEFAULT_RUNS_ROOT = PROJECT_ROOT / "runs_manual" / "app"
+DEFAULT_SF3D_PYTHON = Path(sys.executable)
+DEFAULT_INSTANTSTYLE_PYTHON = Path(sys.executable)
+DEFAULT_FOREGROUND_RATIO = 0.85
+DEFAULT_TEXTURE_RESOLUTION = 1024
+DEFAULT_REMESH_OPTION = "none"
+DEFAULT_VIEW_RESOLUTION = 512
+DEFAULT_CAMERA_DISTANCE = 1.8
+DEFAULT_CAMERA_FOVY_DEG = 40.0
+DEFAULT_SEED = 42
+DEFAULT_STRENGTH = 0.72
+DEFAULT_STYLE_SCALE = 1.8
+DEFAULT_GUIDANCE_SCALE = 6.5
+DEFAULT_NUM_INFERENCE_STEPS = 35
+DEFAULT_CONTROLNET_CONDITIONING_SCALE = 0.45
+PIPELINE_PROGRESS_STEPS = [
+    "接收任务",
+    "图像预处理",
+    "SF3D重建",
+    "多视角采样",
+    "六视角风格化",
+    "UV回贴",
+    "返回模型",
+]
+
+
+@dataclass(frozen=True)
+class AppPipelineConfig:
+    runs_root: Path = DEFAULT_RUNS_ROOT
+    sf3d_python: Path = DEFAULT_SF3D_PYTHON
+    instantstyle_python: Path = DEFAULT_INSTANTSTYLE_PYTHON
+    foreground_ratio: float = DEFAULT_FOREGROUND_RATIO
+    texture_resolution: int = DEFAULT_TEXTURE_RESOLUTION
+    remesh_option: str = DEFAULT_REMESH_OPTION
+    view_resolution: int = DEFAULT_VIEW_RESOLUTION
+    camera_distance: float = DEFAULT_CAMERA_DISTANCE
+    camera_fovy_deg: float = DEFAULT_CAMERA_FOVY_DEG
+    seed: int = DEFAULT_SEED
+    strength: float = DEFAULT_STRENGTH
+    style_scale: float = DEFAULT_STYLE_SCALE
+    guidance_scale: float = DEFAULT_GUIDANCE_SCALE
+    num_inference_steps: int = DEFAULT_NUM_INFERENCE_STEPS
+    controlnet_conditioning_scale: float = DEFAULT_CONTROLNET_CONDITIONING_SCALE
+
+
+def _env_path(name: str, default: Path) -> Path:
+    value = os.environ.get(name)
+    return Path(value) if value else default
+
+
+def _env_float(name: str, default: float) -> float:
+    value = os.environ.get(name)
+    return float(value) if value else default
+
+
+def _env_int(name: str, default: int) -> int:
+    value = os.environ.get(name)
+    return int(value) if value else default
+
+
+def get_pipeline_config() -> AppPipelineConfig:
+    return AppPipelineConfig(
+        runs_root=_env_path("APP_RUNS_ROOT", DEFAULT_RUNS_ROOT),
+        sf3d_python=_env_path("APP_SF3D_PYTHON", DEFAULT_SF3D_PYTHON),
+        instantstyle_python=_env_path("APP_INSTANTSTYLE_PYTHON", DEFAULT_INSTANTSTYLE_PYTHON),
+        foreground_ratio=_env_float("APP_FOREGROUND_RATIO", DEFAULT_FOREGROUND_RATIO),
+        texture_resolution=_env_int("APP_TEXTURE_RESOLUTION", DEFAULT_TEXTURE_RESOLUTION),
+        remesh_option=os.environ.get("APP_REMESH_OPTION", DEFAULT_REMESH_OPTION),
+        view_resolution=_env_int("APP_VIEW_RESOLUTION", DEFAULT_VIEW_RESOLUTION),
+        camera_distance=_env_float("APP_CAMERA_DISTANCE", DEFAULT_CAMERA_DISTANCE),
+        camera_fovy_deg=_env_float("APP_CAMERA_FOVY_DEG", DEFAULT_CAMERA_FOVY_DEG),
+        seed=_env_int("APP_SEED", DEFAULT_SEED),
+        strength=_env_float("APP_STRENGTH", DEFAULT_STRENGTH),
+        style_scale=_env_float("APP_STYLE_SCALE", DEFAULT_STYLE_SCALE),
+        guidance_scale=_env_float("APP_GUIDANCE_SCALE", DEFAULT_GUIDANCE_SCALE),
+        num_inference_steps=_env_int("APP_NUM_INFERENCE_STEPS", DEFAULT_NUM_INFERENCE_STEPS),
+        controlnet_conditioning_scale=_env_float(
+            "APP_CONTROLNET_CONDITIONING_SCALE",
+            DEFAULT_CONTROLNET_CONDITIONING_SCALE,
+        ),
+    )
 
 
 def now_text() -> str:
@@ -47,6 +144,41 @@ def html_text(text: str) -> str:
     return html.escape((text or "").strip()).replace("\n", "<br>")
 
 
+def build_run_config(
+    *,
+    task_id: str,
+    image_path: str,
+    reference_image_path: str,
+    prompt_text: str,
+    run_dir: Path,
+    config: AppPipelineConfig,
+) -> dict[str, object]:
+    return {
+        "mode": "ui",
+        "task_id": task_id,
+        "input": str(image_path),
+        "style_image": str(reference_image_path),
+        "prompt": prompt_text,
+        "run_name": run_dir.name,
+        "runs_root": str(config.runs_root),
+        "run_dir": str(run_dir),
+        "sf3d_python": str(config.sf3d_python),
+        "instantstyle_python": str(config.instantstyle_python),
+        "foreground_ratio": config.foreground_ratio,
+        "texture_resolution": config.texture_resolution,
+        "remesh_option": config.remesh_option,
+        "view_resolution": config.view_resolution,
+        "camera_distance": config.camera_distance,
+        "camera_fovy_deg": config.camera_fovy_deg,
+        "seed": config.seed,
+        "strength": config.strength,
+        "style_scale": config.style_scale,
+        "guidance_scale": config.guidance_scale,
+        "num_inference_steps": config.num_inference_steps,
+        "controlnet_conditioning_scale": config.controlnet_conditioning_scale,
+    }
+
+
 def status_card(task_id: str = "", status: str = "idle", message: str = "等待创建任务") -> str:
     return f"""
     <div class="status-box">
@@ -79,7 +211,7 @@ def toast_card(message: str = "", detail: str = "", visible: bool = False) -> st
 
 
 def progress_card(step: int) -> str:
-    steps = ["接收照片", "读取参考图", "提示词注入", "返回模型"]
+    steps = PIPELINE_PROGRESS_STEPS
     items = []
     for index, label in enumerate(steps, start=1):
         state = "done" if index < step else "active" if index == step else "idle"
@@ -97,6 +229,12 @@ def progress_card(step: int) -> str:
 def result_card(record: dict | None) -> str:
     if not record:
         return "<div class='empty-box'>结果将在任务完成后显示。</div>"
+    error_html = ""
+    if record.get("error"):
+        error_html = f"<dt>错误</dt><dd>{html_text(str(record['error']))}</dd>"
+    viewer_html = ""
+    if record.get("viewer_path"):
+        viewer_html = f"<dt>预览页</dt><dd>{html_text(str(record['viewer_path']))}</dd>"
     return f"""
     <div class="result-box">
         <dl>
@@ -104,6 +242,9 @@ def result_card(record: dict | None) -> str:
             <dt>Prompt</dt><dd>{html_text(record['prompt_text'])}</dd>
             <dt>输入</dt><dd>{html_text(record['image_name'])}</dd>
             <dt>输出</dt><dd>{html_text(record['model_path'])}</dd>
+            <dt>运行目录</dt><dd>{html_text(record.get('run_dir', ''))}</dd>
+            {viewer_html}
+            {error_html}
             <dt>更新时间</dt><dd>{html_text(record['updated_at'])}</dd>
         </dl>
     </div>
@@ -145,6 +286,8 @@ def query_card(task_id: str, history: list[dict] | None) -> str:
             <dt>状态</dt><dd>{html_text(match['status'].upper())}</dd>
             <dt>参考图</dt><dd>{html_text(match['reference_name'])}</dd>
             <dt>Prompt</dt><dd>{html_text(match['prompt_text'])}</dd>
+            <dt>运行目录</dt><dd>{html_text(match.get('run_dir', ''))}</dd>
+            <dt>输出模型</dt><dd>{html_text(match.get('model_path', ''))}</dd>
         </dl>
     </div>
     """
@@ -157,6 +300,9 @@ def build_record(
     prompt_text: str,
     status: str,
     model_path: str = "",
+    run_dir: str = "",
+    viewer_path: str = "",
+    error: str = "",
 ) -> dict:
     return {
         "task_id": task_id,
@@ -165,6 +311,9 @@ def build_record(
         "prompt_text": prompt_text.strip() if prompt_text else "",
         "status": status,
         "model_path": model_path,
+        "run_dir": run_dir,
+        "viewer_path": viewer_path,
+        "error": error,
         "updated_at": now_text(),
     }
 
@@ -174,28 +323,55 @@ def submit_generation_task(image_path: str, reference_image_path: str, prompt_te
         raise gr.Error("请先上传一张照片。")
     if not reference_image_path:
         raise gr.Error("请先上传一张风格参考图。")
-    if not PLACEHOLDER_MODEL.exists():
-        raise gr.Error("未找到占位模型 `mesh_raw.glb`。")
+    if not prompt_text or not prompt_text.strip():
+        raise gr.Error("请填写提示词。")
+    if not Path(image_path).is_file():
+        raise gr.Error("上传的照片文件不存在。")
+    if not Path(reference_image_path).is_file():
+        raise gr.Error("上传的参考图文件不存在。")
 
-    # TODO: 替换为真实后端提交接口。
-    _payload = {
-        "image_path": image_path,
-        "reference_image_path": reference_image_path,
-        "prompt_text": prompt_text,
-    }
     return build_task_id()
 
 
-def run_generation(image_path: str, reference_image_path: str, prompt_text: str, history: list[dict] | None):
+def run_generation(
+    image_path: str,
+    reference_image_path: str,
+    prompt_text: str,
+    history: list[dict] | None,
+    config: AppPipelineConfig | None = None,
+):
     history_items = normalize_history(history)
     task_id = submit_generation_task(image_path, reference_image_path, prompt_text)
+    prompt_text = prompt_text.strip()
+    pipeline_config = config or get_pipeline_config()
+    pipeline_config.runs_root.mkdir(parents=True, exist_ok=True)
+    run_dir = resolve_run_dir(pipeline_config.runs_root, task_id.lower())
+    create_run_tree(run_dir)
+    write_json(
+        run_dir / "run_config.json",
+        build_run_config(
+            task_id=task_id,
+            image_path=image_path,
+            reference_image_path=reference_image_path,
+            prompt_text=prompt_text,
+            run_dir=run_dir,
+            config=pipeline_config,
+        ),
+    )
 
-    queued = build_record(task_id, image_path, reference_image_path, prompt_text, "queued")
+    queued = build_record(
+        task_id,
+        image_path,
+        reference_image_path,
+        prompt_text,
+        "queued",
+        run_dir=str(run_dir),
+    )
     history_items = upsert_top(history_items, queued)
     yield (
         gr.skip(),
         task_id,
-        toast_card("任务已接收", "正在准备实景重建与风格融合流程", True),
+        toast_card("任务已接收", f"结果目录：{run_dir}", True),
         status_card(task_id, "queued", "任务已创建"),
         progress_card(1),
         result_card(None),
@@ -203,55 +379,156 @@ def run_generation(image_path: str, reference_image_path: str, prompt_text: str,
         history_items,
     )
 
-    time.sleep(0.7)
-    running = build_record(task_id, image_path, reference_image_path, prompt_text, "running")
-    history_items = upsert_top(history_items, running)
-    yield (
-        gr.skip(),
-        task_id,
-        toast_card("正在读取风格参考图", "提取颜色、材质与构图特征", True),
-        status_card(task_id, "running", "正在进行三维重建"),
-        progress_card(2),
-        result_card(None),
-        history_card(history_items),
-        history_items,
-    )
+    def update_history(
+        status: str,
+        model_path: str = "",
+        viewer_path: str = "",
+        error: str = "",
+    ) -> dict:
+        nonlocal history_items
+        record = build_record(
+            task_id,
+            image_path,
+            reference_image_path,
+            prompt_text,
+            status,
+            model_path=model_path,
+            run_dir=str(run_dir),
+            viewer_path=viewer_path,
+            error=error,
+        )
+        history_items = upsert_top(history_items, record)
+        return record
 
-    time.sleep(0.8)
-    stylized = build_record(task_id, image_path, reference_image_path, prompt_text, "running")
-    history_items = upsert_top(history_items, stylized)
-    yield (
-        gr.skip(),
-        task_id,
-        toast_card("正在注入提示词", "将语义描述写入风格化管线", True),
-        status_card(task_id, "running", "正在注入提示词"),
-        progress_card(3),
-        result_card(None),
-        history_card(history_items),
-        history_items,
-    )
+    try:
+        update_history("running")
+        yield (
+            gr.skip(),
+            task_id,
+            toast_card("正在预处理输入图像", "抠出主体并生成透明背景", True),
+            status_card(task_id, "running", "正在进行图像预处理"),
+            progress_card(2),
+            result_card(None),
+            history_card(history_items),
+            history_items,
+        )
+        _preprocess_result = run_preprocess_step(
+            input_path=Path(image_path),
+            run_dir=run_dir,
+            foreground_ratio=pipeline_config.foreground_ratio,
+        )
 
-    time.sleep(0.8)
-    completed = build_record(task_id, image_path, reference_image_path, prompt_text, "completed", str(PLACEHOLDER_MODEL))
-    history_items = upsert_top(history_items, completed)
+        update_history("running")
+        yield (
+            gr.skip(),
+            task_id,
+            toast_card("正在调用 SF3D", "生成白模并导出 mesh_raw.glb", True),
+            status_card(task_id, "running", "正在进行三维重建"),
+            progress_card(3),
+            result_card(None),
+            history_card(history_items),
+            history_items,
+        )
+        _sf3d_result = run_sf3d_step(
+            run_dir=run_dir,
+            sf3d_python=pipeline_config.sf3d_python,
+            texture_resolution=pipeline_config.texture_resolution,
+            remesh_option=pipeline_config.remesh_option,
+        )
+
+        update_history("running")
+        yield (
+            gr.skip(),
+            task_id,
+            toast_card("正在采样六视角", "为后续风格化生成 rgb / control / mask", True),
+            status_card(task_id, "running", "正在采样多视角"),
+            progress_card(4),
+            result_card(None),
+            history_card(history_items),
+            history_items,
+        )
+        _sample_views_result = run_sample_views_step(
+            run_dir=run_dir,
+            view_resolution=pipeline_config.view_resolution,
+            camera_distance=pipeline_config.camera_distance,
+            camera_fovy_deg=pipeline_config.camera_fovy_deg,
+        )
+
+        update_history("running")
+        yield (
+            gr.skip(),
+            task_id,
+            toast_card("正在进行六视角风格化", "批量加载风格模型并生成 stylized 图", True),
+            status_card(task_id, "running", "正在风格化多视角"),
+            progress_card(5),
+            result_card(None),
+            history_card(history_items),
+            history_items,
+        )
+        _stylize_result = run_instantstyle_step(
+            run_dir=run_dir,
+            instantstyle_python=pipeline_config.instantstyle_python,
+            style_image=Path(reference_image_path),
+            prompt=prompt_text,
+            seed=pipeline_config.seed,
+            strength=pipeline_config.strength,
+            style_scale=pipeline_config.style_scale,
+            guidance_scale=pipeline_config.guidance_scale,
+            num_inference_steps=pipeline_config.num_inference_steps,
+            controlnet_conditioning_scale=pipeline_config.controlnet_conditioning_scale,
+        )
+
+        update_history("running")
+        yield (
+            gr.skip(),
+            task_id,
+            toast_card("正在执行 UV 回贴", "将多视角风格化结果烘回材质贴图", True),
+            status_card(task_id, "running", "正在回贴纹理"),
+            progress_card(6),
+            result_card(None),
+            history_card(history_items),
+            history_items,
+        )
+        retexture_result = run_retexture_step(run_dir=run_dir)
+        viewer_result = run_viewer_step(run_dir=run_dir)
+    except Exception as exc:
+        error_message = str(exc)
+        failed = update_history("failed", error=error_message)
+        yield (
+            gr.skip(),
+            task_id,
+            toast_card("生成失败", error_message, True),
+            status_card(task_id, "failed", "任务失败"),
+            progress_card(6),
+            result_card(failed),
+            history_card(history_items),
+            history_items,
+        )
+        raise gr.Error(f"生成失败：{error_message}") from exc
+
+    final_model_path = retexture_result["mesh_path"]
+    completed = update_history(
+        "completed",
+        model_path=str(final_model_path),
+        viewer_path=str(viewer_result["viewer_html"]),
+    )
     yield (
-        str(PLACEHOLDER_MODEL),
+        str(final_model_path),
         task_id,
-        toast_card("生成完成", "模型已回传，可旋转查看", True),
+        toast_card("生成完成", f"模型已回传，可从 {run_dir} 复现", True),
         status_card(task_id, "completed", "任务完成"),
-        progress_card(4),
+        progress_card(len(PIPELINE_PROGRESS_STEPS) + 1),
         result_card(completed),
         history_card(history_items),
         history_items,
     )
-
-    time.sleep(0.9)
+    time.sleep(0.8)
     yield (
-        gr.skip(),
+        str(final_model_path),
         task_id,
         "",
-        status_card(task_id, "completed", "任务完成"),
-        progress_card(4),
+        "",
+        "",
         result_card(completed),
         history_card(history_items),
         history_items,
@@ -943,6 +1220,11 @@ footer {
     color: var(--accent);
 }
 
+.status-badge.failed {
+    background: rgba(169, 62, 48, 0.14);
+    color: #a33e30;
+}
+
 .status-text,
 .task-id {
     font-size: 13px;
@@ -956,7 +1238,7 @@ footer {
 
 .progress-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 8px;
 }
 
@@ -1031,7 +1313,7 @@ footer {
 """
 
 
-with gr.Blocks(title=APP_TITLE) as demo:
+with gr.Blocks(title=APP_TITLE, css=CUSTOM_CSS, theme=gr.themes.Base()) as demo:
     history_state = gr.State([])
 
     gr.HTML(
@@ -1148,9 +1430,8 @@ with gr.Blocks(title=APP_TITLE) as demo:
 
 
 if __name__ == "__main__":
-    demo.launch(
-        server_name="127.0.0.1",
-        share=False,
-        css=CUSTOM_CSS,
-        theme=gr.themes.Base(),
+    demo.queue(default_concurrency_limit=1, max_size=8).launch(
+        server_name="0.0.0.0",
+        share=True,
+        show_api=False,
     )
