@@ -1,0 +1,56 @@
+# ============================================================
+# 万物赋新台 — Stylized 3D Pipeline
+# ============================================================
+# 建议使用 Python 3.11 + CUDA 12.4 环境
+# 安装: pip install -r requirements.txt
+#
+# 本地依赖包 (stable-fast-3d 子目录):
+#   pip install stable-fast-3d/texture_baker/
+#   pip install stable-fast-3d/uv_unwrapper/
+
+# --- 核心深度学习框架 ---
+torch>=2.5.0
+torchvision>=0.20.0
+safetensors>=0.5.0
+
+# --- diffusers / transformers 生态 ---
+diffusers>=0.31.0
+transformers>=4.42.0
+accelerate>=1.0.0
+huggingface-hub>=0.23.0
+tokenizers>=0.20.0
+
+# --- 3D 处理 ---
+trimesh>=4.4.0
+pyrender>=0.1.45
+PyOpenGL>=3.1.0
+xatlas>=0.0.9
+pynanoinstantmeshes>=0.0.3
+gpytoolbox>=0.2.0
+vhacdx>=0.0.8
+
+# --- 图像处理 ---
+Pillow>=11.0.0
+numpy>=1.26.0,<2.0
+scipy>=1.15.0
+opencv-python-headless>=4.0.0
+rembg>=2.0.57
+
+# --- 科学计算 / 工具 ---
+einops>=0.7.0
+omegaconf>=2.3.0
+jaxtyping>=0.2.0
+PyYAML>=6.0
+tqdm>=4.0.0
+fsspec>=2024.0.0
+filelock>=3.0.0
+packaging>=24.0
+
+# --- Gradio 前端 ---
+gradio>=5.0.0
+
+# --- InstantStyle 额外依赖 ---
+# IP-Adapter 模型文件需单独下载，见 README
+
+# --- 测试 ---
+pytest>=9.0.0
